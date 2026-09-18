@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import authRoutes from './routes/auth.routes.js';
 
 const app: Application = express();
 
@@ -16,6 +17,9 @@ app.get('/health', (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Routes
+app.use('/auth', authRoutes);
 
 // 404 handler — must come after all routes
 app.use((_req: Request, res: Response) => {
