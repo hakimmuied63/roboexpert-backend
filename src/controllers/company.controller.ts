@@ -3,6 +3,10 @@ import { z } from 'zod';
 import Company from '../models/Company.js';
 import User from '../models/User.js';
 import { slugify, uniqueSlug } from '../utils/slug.js';
+import mongoose from 'mongoose';
+import Product from '../models/Product.js';
+import ProductVariant from '../models/ProductVariant.js';
+import Order from '../models/Order.js';
 
 // ---------- Validation schema ----------
 
@@ -24,6 +28,23 @@ const createCompanySchema = z.object({
 });
 
 // ---------- Create company (seller only) ----------
+
+const updateCompanySchema = z.object({
+    name: z.string().min(1).trim().optional(),
+    contactEmail: z.string().email().toLowerCase().trim().optional(),
+    contactPhone: z.string().trim().optional(),
+    address: z
+      .object({
+        line1: z.string().optional(),
+        line2: z.string().optional(),
+        city: z.string().optional(),
+        state: z.string().optional(),
+        pincode: z.string().optional(),
+        country: z.string().optional(),
+      })
+      .optional(),
+    logoUrl: z.string().url().optional(),
+  });
 
 export const createCompany = async (req: Request, res: Response) => {
   try {
@@ -127,3 +148,85 @@ export const listCompanies = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+// ---------- Update my company (seller) ----------
+
+export const updateMyCompany = async (req: Request, res: Response) => {
+    try {
+      if (!req.user || req.user.role !== 'seller') {
+        return res.status(403).json({ ok: false, error: 'Seller access required' });
+      }
+  
+      const parsed = updateCompanySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Validation failed',
+          details: parsed.error.flatten().fieldErrors,
+        });
+      }
+  
+      const company = await Company.findOneAndUpdate(
+        { ownerUserId: req.user.userId },
+        { $set: parsed.data },
+        { new: true }
+      );
+      if (!company) {
+        return res.status(404).json({ ok: false, error: 'No company found' });
+      }
+  
+      return res.status(200).json({ ok: true, company });
+    } catch (error) {
+      console.error('Update my company error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };
+  // ---------- Seller dashboard stats ----------
+
+export const getSellerStats = async (req: Request, res: Response) => {
+    try {
+      if (!req.user || req.user.role !== 'seller') {
+        return res.status(403).json({ ok: false, error: 'Seller access required' });
+      }
+      if (!req.user.companyId) {
+        return res.status(400).json({ ok: false, error: 'No company found' });
+      }
+  
+      const companyId = req.user.companyId;
+  
+      const [totalProducts, activeProducts, totalOrders, pendingOrders, lowStockVariants] =
+        await Promise.all([
+          Product.countDocuments({ companyId }),
+          Product.countDocuments({ companyId, isActive: true }),
+          Order.countDocuments({ companyId }),
+          Order.countDocuments({ companyId, status: 'placed' }),
+          ProductVariant.countDocuments({ companyId, stock: { $lte: 5 }, isActive: true }),
+        ]);
+  
+      const revenueResult = await Order.aggregate([
+        { $match: { companyId: new mongoose.Types.ObjectId(companyId), paymentStatus: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$total' } } },
+      ]);
+      const revenue = revenueResult[0]?.total ?? 0;
+  
+      const ordersByStatus = await Order.aggregate([
+        { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]);
+  
+      return res.status(200).json({
+        ok: true,
+        stats: {
+          totalProducts,
+          activeProducts,
+          totalOrders,
+          pendingOrders,
+          lowStockVariants,
+          revenue,
+          ordersByStatus,
+        },
+      });
+    } catch (error) {
+      console.error('Seller stats error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };
