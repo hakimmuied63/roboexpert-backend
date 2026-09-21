@@ -2,6 +2,8 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes.js';
 import companyRoutes from './routes/company.routes.js';
+import productRoutes from './routes/product.routes.js';
+import catalogRoutes from './routes/catalog.routes.js';
 
 const app: Application = express();
 
@@ -22,6 +24,8 @@ app.get('/health', (_req: Request, res: Response) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/companies', companyRoutes);
+app.use('/products', productRoutes);
+app.use('/catalog', catalogRoutes);
 
 // 404 handler — must come after all routes
 app.use((_req: Request, res: Response) => {
