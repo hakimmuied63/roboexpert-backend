@@ -11,8 +11,7 @@ import { generateOrderNumber } from '../utils/orderNumber.js';
 // ---------- Validation ----------
 
 const placeOrderSchema = z.object({
-  companyId: z.string(),
-  buyer: z.object({
+    buyer: z.object({
     name: z.string().min(1).trim(),
     email: z.string().email().toLowerCase().trim(),
     phone: z.string().min(5).trim(),
@@ -53,161 +52,172 @@ const createUniqueOrderNumber = async (): Promise<string> => {
 };
 
 // ---------- PUBLIC: Place order ----------
+// ---------- PUBLIC: Place order (multi-company carts supported) ----------
 
 export const placeOrder = async (req: Request, res: Response) => {
-  try {
-    const parsed = placeOrderSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Validation failed',
-        details: parsed.error.flatten().fieldErrors,
-      });
-    }
-
-    const { companyId, buyer, shippingAddress, items, notes } = parsed.data;
-
-    if (!mongoose.Types.ObjectId.isValid(companyId)) {
-      return res.status(400).json({ ok: false, error: 'Invalid company ID' });
-    }
-
-    // Company must exist and be active
-    const company = await Company.findOne({ _id: companyId, isActive: true });
-    if (!company) {
-      return res.status(404).json({ ok: false, error: 'Store not found' });
-    }
-
-    // Validate all products/variants belong to this company and are active
-    const lineItems: {
-      productId: mongoose.Types.ObjectId;
-      variantId: mongoose.Types.ObjectId;
-      quantity: number;
-      unitPrice: number;
-      lineTotal: number;
-      productSnapshot: {
-        name: string;
-        image?: string;
-        variantAttributes: Record<string, string>;
-        sku: string;
-      };
-    }[] = [];
-
-    let subtotal = 0;
-
-    for (const item of items) {
-      if (
-        !mongoose.Types.ObjectId.isValid(item.productId) ||
-        !mongoose.Types.ObjectId.isValid(item.variantId)
-      ) {
-        return res.status(400).json({ ok: false, error: 'Invalid product or variant ID' });
-      }
-
-      const product = await Product.findOne({
-        _id: item.productId,
-        companyId,
-        isActive: true,
-      });
-      if (!product) {
-        return res
-          .status(404)
-          .json({ ok: false, error: `Product not found or unavailable: ${item.productId}` });
-      }
-
-      const variant = await ProductVariant.findOne({
-        _id: item.variantId,
-        productId: product._id,
-        companyId,
-        isActive: true,
-      });
-      if (!variant) {
-        return res
-          .status(404)
-          .json({ ok: false, error: `Variant not found: ${item.variantId}` });
-      }
-
-      if (variant.stock < item.quantity) {
-        return res.status(409).json({
+    try {
+      const parsed = placeOrderSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
           ok: false,
-          error: `Insufficient stock for ${variant.sku}. Available: ${variant.stock}`,
+          error: 'Validation failed',
+          details: parsed.error.flatten().fieldErrors,
         });
       }
-
-      const lineTotal = variant.price * item.quantity;
-      subtotal += lineTotal;
-
-      lineItems.push({
-        productId: product._id,
-        variantId: variant._id,
-        quantity: item.quantity,
-        unitPrice: variant.price,
-        lineTotal,
-        productSnapshot: {
-          name: product.name,
-          image: product.images[0],
-          variantAttributes: Object.fromEntries(variant.attributes),
-          sku: variant.sku,
-        },
+  
+      const { buyer, shippingAddress, items, notes } = parsed.data;
+  
+      // Step 1: Validate all items and gather full product/variant info
+      type EnrichedItem = {
+        product: any;
+        variant: any;
+        quantity: number;
+        lineTotal: number;
+        companyId: string;
+      };
+  
+      const enriched: EnrichedItem[] = [];
+  
+      for (const item of items) {
+        if (
+          !mongoose.Types.ObjectId.isValid(item.productId) ||
+          !mongoose.Types.ObjectId.isValid(item.variantId)
+        ) {
+          return res.status(400).json({ ok: false, error: 'Invalid product or variant ID' });
+        }
+  
+        const product = await Product.findOne({ _id: item.productId, isActive: true });
+        if (!product) {
+          return res
+            .status(404)
+            .json({ ok: false, error: `Product not found or unavailable: ${item.productId}` });
+        }
+  
+        const variant = await ProductVariant.findOne({
+          _id: item.variantId,
+          productId: product._id,
+          isActive: true,
+        });
+        if (!variant) {
+          return res
+            .status(404)
+            .json({ ok: false, error: `Variant not found: ${item.variantId}` });
+        }
+  
+        if (variant.stock < item.quantity) {
+          return res.status(409).json({
+            ok: false,
+            error: `Insufficient stock for ${variant.sku}. Available: ${variant.stock}`,
+          });
+        }
+  
+        enriched.push({
+          product,
+          variant,
+          quantity: item.quantity,
+          lineTotal: variant.price * item.quantity,
+          companyId: product.companyId.toString(),
+        });
+      }
+  
+      // Step 2: Group items by company
+      const byCompany: Record<string, EnrichedItem[]> = {};
+      for (const item of enriched) {
+        if (!byCompany[item.companyId]) byCompany[item.companyId] = [];
+        byCompany[item.companyId].push(item);
+      }
+  
+      // Step 3: Create one order per company
+      const createdOrders = [];
+  
+      for (const [companyId, companyItems] of Object.entries(byCompany)) {
+        const company = await Company.findOne({ _id: companyId, isActive: true });
+        if (!company) {
+          return res
+            .status(404)
+            .json({ ok: false, error: `Store not found: ${companyId}` });
+        }
+  
+        const subtotal = companyItems.reduce((sum, i) => sum + i.lineTotal, 0);
+        const shippingFee = 0;
+        const total = subtotal + shippingFee;
+        const orderNumber = await createUniqueOrderNumber();
+  
+        const order = await Order.create({
+          companyId,
+          orderNumber,
+          buyer,
+          shippingAddress,
+          subtotal,
+          shippingFee,
+          total,
+          status: 'placed',
+          paymentStatus: 'pending',
+          notes,
+        });
+  
+        const createdItems = await OrderItem.insertMany(
+          companyItems.map((i) => ({
+            orderId: order._id,
+            companyId,
+            productId: i.product._id,
+            variantId: i.variant._id,
+            quantity: i.quantity,
+            unitPrice: i.variant.price,
+            lineTotal: i.lineTotal,
+            productSnapshot: {
+              name: i.product.name,
+              image: i.product.images[0],
+              variantAttributes: Object.fromEntries(i.variant.attributes),
+              sku: i.variant.sku,
+            },
+          }))
+        );
+  
+        // Decrement stock for each variant
+        for (const i of companyItems) {
+          await ProductVariant.findByIdAndUpdate(i.variant._id, {
+            $inc: { stock: -i.quantity },
+          });
+        }
+  
+        createdOrders.push({
+          order,
+          items: createdItems,
+          company: { _id: company._id, name: company.name, slug: company.slug },
+        });
+      }
+  
+      return res.status(201).json({
+        ok: true,
+        orders: createdOrders,
+        message: `Created ${createdOrders.length} order(s)`,
       });
+    } catch (error) {
+      console.error('Place order error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
-
-    const shippingFee = 0;
-    const total = subtotal + shippingFee;
-    const orderNumber = await createUniqueOrderNumber();
-
-    const order = await Order.create({
-      companyId,
-      orderNumber,
-      buyer,
-      shippingAddress,
-      subtotal,
-      shippingFee,
-      total,
-      status: 'placed',
-      paymentStatus: 'pending',
-      notes,
-    });
-
-    const createdItems = await OrderItem.insertMany(
-      lineItems.map((li) => ({
-        ...li,
-        orderId: order._id,
-        companyId,
-      }))
-    );
-
-    // Decrement stock for each variant
-    for (const item of lineItems) {
-      await ProductVariant.findByIdAndUpdate(item.variantId, {
-        $inc: { stock: -item.quantity },
-      });
-    }
-
-    return res.status(201).json({ ok: true, order, items: createdItems });
-  } catch (error) {
-    console.error('Place order error:', error);
-    return res.status(500).json({ ok: false, error: 'Internal server error' });
-  }
-};
-
-// ---------- PUBLIC: Track order by order number ----------
+  };
+  // ---------- PUBLIC: Track order by order number ----------
 
 export const trackOrder = async (req: Request, res: Response) => {
-  try {
-    const { orderNumber } = req.params;
-
-    const order = await Order.findOne({ orderNumber });
-    if (!order) {
-      return res.status(404).json({ ok: false, error: 'Order not found' });
+    try {
+      const { orderNumber } = req.params;
+  
+      const order = await Order.findOne({ orderNumber });
+      if (!order) {
+        return res.status(404).json({ ok: false, error: 'Order not found' });
+      }
+  
+      const items = await OrderItem.find({ orderId: order._id });
+  
+      return res.status(200).json({ ok: true, order, items });
+    } catch (error) {
+      console.error('Track order error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
-
-    const items = await OrderItem.find({ orderId: order._id });
-
-    return res.status(200).json({ ok: true, order, items });
-  } catch (error) {
-    console.error('Track order error:', error);
-    return res.status(500).json({ ok: false, error: 'Internal server error' });
-  }
-};
+  };
+  
 
 // ---------- SELLER: List my orders ----------
 
