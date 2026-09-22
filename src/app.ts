@@ -7,6 +7,7 @@ import catalogRoutes from './routes/catalog.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import paymentConfigRoutes from './routes/paymentConfig.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 
 const app: Application = express();
 
@@ -32,6 +33,7 @@ app.use('/catalog', catalogRoutes);
 app.use('/orders', orderRoutes);
 app.use('/admin', adminRoutes);
 app.use('/payment-config', paymentConfigRoutes);
+app.use('/payments', paymentRoutes);
 
 // 404 handler — must come after all routes
 app.use((_req: Request, res: Response) => {

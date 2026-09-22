@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import Product from '../models/Product.js';
 import ProductVariant from '../models/ProductVariant.js';
 import Company from '../models/Company.js';
+import Category from '../models/Category.js';
 import { slugify, uniqueSlug } from '../utils/slug.js';
 
 // ---------- Validation ----------
@@ -281,3 +282,51 @@ export const getPublicProduct = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+// ---------- PUBLIC: list all active products (marketplace-wide) ----------
+
+export const listAllPublicProducts = async (_req: Request, res: Response) => {
+    try {
+      const products = await Product.find({ isActive: true })
+        .sort({ createdAt: -1 })
+        .limit(100);
+  
+      const companyIds = [...new Set(products.map((p) => p.companyId.toString()))];
+      const companies = await Company.find({ _id: { $in: companyIds } }).select(
+        '_id name slug'
+      );
+  
+      const companyMap: Record<string, { _id: string; name: string; slug: string }> = {};
+      companies.forEach((c) => {
+        companyMap[c._id.toString()] = {
+          _id: c._id.toString(),
+          name: c.name,
+          slug: c.slug,
+        };
+      });
+  
+      const productsWithCompany = products.map((p) => ({
+        ...p.toJSON(),
+        company: companyMap[p.companyId.toString()] ?? null,
+      }));
+  
+      return res.status(200).json({ ok: true, products: productsWithCompany });
+    } catch (error) {
+      console.error('List all public products error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };
+  // ---------- PUBLIC: list all global categories ----------
+
+export const listPublicCategories = async (_req: Request, res: Response) => {
+    try {
+      const categories = await Category.find({
+        isActive: true,
+        companyId: null,
+      }).sort({ name: 1 });
+  
+      return res.status(200).json({ ok: true, categories });
+    } catch (error) {
+      console.error('List public categories error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };

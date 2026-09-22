@@ -1,0 +1,391 @@
+{
+    "info": {
+      "name": "Roboexpert Backend",
+      "description": "Full API collection for Roboexpert marketplace backend",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+      { "key": "baseUrl", "value": "http://localhost:5001" },
+      { "key": "token", "value": "" },
+      { "key": "refreshToken", "value": "" },
+      { "key": "sellerToken", "value": "" },
+      { "key": "adminToken", "value": "" },
+      { "key": "companyId", "value": "" },
+      { "key": "productId", "value": "" },
+      { "key": "variantId", "value": "" },
+      { "key": "orderId", "value": "" },
+      { "key": "orderNumber", "value": "" }
+    ],
+    "item": [
+      {
+        "name": "Health",
+        "item": [
+          {
+            "name": "Health Check",
+            "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+          }
+        ]
+      },
+      {
+        "name": "Auth",
+        "item": [
+          {
+            "name": "Signup Seller",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.accessToken) {",
+              "  pm.collectionVariables.set('sellerToken', res.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+              "  pm.collectionVariables.set('token', res.accessToken);",
+              "}"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"email\": \"seller3@test.com\",\n  \"password\": \"testpass123\",\n  \"name\": \"Test Seller 3\",\n  \"role\": \"seller\"\n}" },
+              "url": "{{baseUrl}}/auth/signup"
+            }
+          },
+          {
+            "name": "Login Seller",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.accessToken) {",
+              "  pm.collectionVariables.set('sellerToken', res.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', res.refreshToken);",
+              "  pm.collectionVariables.set('token', res.accessToken);",
+              "}"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"email\": \"atlas@test.com\",\n  \"password\": \"testpass123\"\n}" },
+              "url": "{{baseUrl}}/auth/login"
+            }
+          },
+          {
+            "name": "Login Admin",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.accessToken) {",
+              "  pm.collectionVariables.set('adminToken', res.accessToken);",
+              "  pm.collectionVariables.set('token', res.accessToken);",
+              "}"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@roboexpert.in\",\n  \"password\": \"adminpass123\"\n}" },
+              "url": "{{baseUrl}}/auth/login"
+            }
+          },
+          {
+            "name": "Refresh Token",
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+              "url": "{{baseUrl}}/auth/refresh"
+            }
+          },
+          {
+            "name": "Logout",
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" },
+              "url": "{{baseUrl}}/auth/logout"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Companies",
+        "item": [
+          {
+            "name": "Create My Company",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.company && res.company._id) { pm.collectionVariables.set('companyId', res.company._id); }"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+              ],
+              "body": { "mode": "raw", "raw": "{\n  \"name\": \"Shoes Company\",\n  \"contactEmail\": \"contact@shoescompany.com\",\n  \"contactPhone\": \"9876543210\"\n}" },
+              "url": "{{baseUrl}}/companies"
+            }
+          },
+          {
+            "name": "Get My Company",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.company && res.company._id) { pm.collectionVariables.set('companyId', res.company._id); }"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/companies/me"
+            }
+          },
+          {
+            "name": "Update My Company",
+            "request": {
+              "method": "PATCH",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+              ],
+              "body": { "mode": "raw", "raw": "{\n  \"contactPhone\": \"9999888877\"\n}" },
+              "url": "{{baseUrl}}/companies/me"
+            }
+          },
+          {
+            "name": "Get My Stats",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/companies/me/stats"
+            }
+          },
+          {
+            "name": "Get Company By Slug (Public)",
+            "request": { "method": "GET", "url": "{{baseUrl}}/companies/slug/shoes-company" }
+          },
+          {
+            "name": "List All Companies (Admin)",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/companies"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Products (Seller)",
+        "item": [
+          {
+            "name": "Create Product",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.product && res.product._id) { pm.collectionVariables.set('productId', res.product._id); }",
+              "if (res.variants && res.variants[0]) { pm.collectionVariables.set('variantId', res.variants[0]._id); }"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+              ],
+              "body": { "mode": "raw", "raw": "{\n  \"name\": \"Running Shoes\",\n  \"description\": \"Lightweight running shoes\",\n  \"basePrice\": 1999,\n  \"images\": [\"https://example.com/shoe1.jpg\"],\n  \"variants\": [\n    {\"sku\": \"RUN-BLK-42-PM\", \"attributes\": {\"size\": \"42\", \"color\": \"Black\"}, \"price\": 1999, \"stock\": 25},\n    {\"sku\": \"RUN-WHT-42-PM\", \"attributes\": {\"size\": \"42\", \"color\": \"White\"}, \"price\": 2099, \"stock\": 15}\n  ]\n}" },
+              "url": "{{baseUrl}}/products"
+            }
+          },
+          {
+            "name": "List My Products",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/products/me"
+            }
+          },
+          {
+            "name": "Get My Product",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/products/me/{{productId}}"
+            }
+          },
+          {
+            "name": "Update Product",
+            "request": {
+              "method": "PATCH",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+              ],
+              "body": { "mode": "raw", "raw": "{\n  \"basePrice\": 1899\n}" },
+              "url": "{{baseUrl}}/products/me/{{productId}}"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Catalog (Public)",
+        "item": [
+          {
+            "name": "List Company Products",
+            "request": { "method": "GET", "url": "{{baseUrl}}/catalog/companies/{{companyId}}/products" }
+          },
+          {
+            "name": "Get Product Detail (Storefront)",
+            "request": { "method": "GET", "url": "{{baseUrl}}/catalog/stores/shoes-company/products/{{productId}}" }
+          }
+        ]
+      },
+      {
+        "name": "Orders",
+        "item": [
+          {
+            "name": "Place Order (Public)",
+            "event": [{ "listen": "test", "script": { "exec": [
+              "const res = pm.response.json();",
+              "if (res.order && res.order._id) { pm.collectionVariables.set('orderId', res.order._id); }",
+              "if (res.order && res.order.orderNumber) { pm.collectionVariables.set('orderNumber', res.order.orderNumber); }"
+            ], "type": "text/javascript" } }],
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"companyId\": \"{{companyId}}\",\n  \"buyer\": {\n    \"name\": \"Test Buyer\",\n    \"email\": \"buyer@test.com\",\n    \"phone\": \"9876543210\"\n  },\n  \"shippingAddress\": {\n    \"line1\": \"123 Main Street\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pincode\": \"400001\",\n    \"country\": \"India\"\n  },\n  \"items\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 2\n    }\n  ]\n}" },
+              "url": "{{baseUrl}}/orders"
+            }
+          },
+          {
+            "name": "Track Order",
+            "request": { "method": "GET", "url": "{{baseUrl}}/orders/track/{{orderNumber}}" }
+          },
+          {
+            "name": "List My Orders (Seller)",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/orders/my"
+            }
+          },
+          {
+            "name": "Get My Order (Seller)",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/orders/my/{{orderId}}"
+            }
+          },
+          {
+            "name": "Update Order Status (Seller)",
+            "request": {
+              "method": "PATCH",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+              ],
+              "body": { "mode": "raw", "raw": "{\n  \"status\": \"confirmed\"\n}" },
+              "url": "{{baseUrl}}/orders/my/{{orderId}}/status"
+            }
+          },
+          {
+            "name": "List All Orders (Admin)",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/orders"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Payment Config",
+        "item": [
+          {
+            "name": "Save Razorpay Keys",
+            "request": {
+              "method": "POST",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" },
+                { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+              ],
+              "body": { "mode": "raw", "raw": "{\n  \"razorpayKeyId\": \"rzp_test_REPLACE\",\n  \"razorpayKeySecret\": \"REPLACE\"\n}" },
+              "url": "{{baseUrl}}/payment-config"
+            }
+          },
+          {
+            "name": "Get My Payment Config",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/payment-config/me"
+            }
+          },
+          {
+            "name": "Delete Payment Config",
+            "request": {
+              "method": "DELETE",
+              "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+              "url": "{{baseUrl}}/payment-config/me"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Payments (Razorpay)",
+        "item": [
+          {
+            "name": "Create Razorpay Order",
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}" },
+              "url": "{{baseUrl}}/payments/create-order"
+            }
+          },
+          {
+            "name": "Verify Payment",
+            "request": {
+              "method": "POST",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"razorpayOrderId\": \"order_REPLACE\",\n  \"razorpayPaymentId\": \"pay_REPLACE\",\n  \"razorpaySignature\": \"sig_REPLACE\"\n}" },
+              "url": "{{baseUrl}}/payments/verify"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Admin",
+        "item": [
+          {
+            "name": "Dashboard Stats",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/admin/stats"
+            }
+          },
+          {
+            "name": "List All Companies",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/admin/companies"
+            }
+          },
+          {
+            "name": "List All Products",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/admin/products"
+            }
+          },
+          {
+            "name": "List All Users",
+            "request": {
+              "method": "GET",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/admin/users"
+            }
+          },
+          {
+            "name": "Toggle Product Status",
+            "request": {
+              "method": "PATCH",
+              "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+              "url": "{{baseUrl}}/admin/products/{{productId}}/toggle-status"
+            }
+          }
+        ]
+      }
+    ]
+  }
