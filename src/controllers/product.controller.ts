@@ -330,3 +330,40 @@ export const listPublicCategories = async (_req: Request, res: Response) => {
       return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
   };
+  // ---------- PUBLIC: get a single product by ID (with variants + company) ----------
+
+export const getPublicProductById = async (req: Request, res: Response) => {
+    try {
+      const { productId } = req.params;
+  
+      if (!mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ ok: false, error: 'Invalid product ID' });
+      }
+  
+      const product = await Product.findOne({ _id: productId, isActive: true });
+      if (!product) {
+        return res.status(404).json({ ok: false, error: 'Product not found' });
+      }
+  
+      const company = await Company.findById(product.companyId).select('_id name slug');
+  
+      const variants = await ProductVariant.find({
+        productId: product._id,
+        isActive: true,
+      });
+  
+      return res.status(200).json({
+        ok: true,
+        product: {
+          ...product.toJSON(),
+          company: company
+            ? { _id: company._id, name: company.name, slug: company.slug }
+            : null,
+        },
+        variants,
+      });
+    } catch (error) {
+      console.error('Get public product by ID error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };
