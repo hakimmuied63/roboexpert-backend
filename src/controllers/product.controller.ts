@@ -416,3 +416,53 @@ export const listProductsByCategory = async (req: Request, res: Response) => {
       return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
   };
+  // ---------- PUBLIC: search products by keyword ----------
+
+export const searchProducts = async (req: Request, res: Response) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const companyId = typeof req.query.companyId === 'string' ? req.query.companyId : undefined;
+
+    if (!q) {
+      return res.status(200).json({ ok: true, products: [] });
+    }
+
+    const filter: Record<string, unknown> = {
+      isActive: true,
+      $or: [
+        { name: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+      ],
+    };
+
+    if (companyId && mongoose.Types.ObjectId.isValid(companyId)) {
+      filter.companyId = companyId;
+    }
+
+    const products = await Product.find(filter).sort({ createdAt: -1 }).limit(100);
+
+    const companyIds = [...new Set(products.map((p) => p.companyId.toString()))];
+    const companies = await Company.find({ _id: { $in: companyIds } }).select(
+      '_id name slug'
+    );
+
+    const companyMap: Record<string, { _id: string; name: string; slug: string }> = {};
+    companies.forEach((c) => {
+      companyMap[c._id.toString()] = {
+        _id: c._id.toString(),
+        name: c.name,
+        slug: c.slug,
+      };
+    });
+
+    const productsWithCompany = products.map((p) => ({
+      ...p.toJSON(),
+      company: companyMap[p.companyId.toString()] ?? null,
+    }));
+
+    return res.status(200).json({ ok: true, products: productsWithCompany });
+  } catch (error) {
+    console.error('Search products error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};

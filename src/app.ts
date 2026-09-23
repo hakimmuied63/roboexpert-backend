@@ -8,6 +8,7 @@ import orderRoutes from './routes/order.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import paymentConfigRoutes from './routes/paymentConfig.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
+import categoryRoutes from './routes/category.routes.js';
 
 const app: Application = express();
 
@@ -29,6 +30,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/auth', authRoutes);
 app.use('/companies', companyRoutes);
 app.use('/products', productRoutes);
+app.use('/categories', categoryRoutes);
 app.use('/catalog', catalogRoutes);
 app.use('/orders', orderRoutes);
 app.use('/admin', adminRoutes);

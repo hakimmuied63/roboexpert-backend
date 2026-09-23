@@ -4,7 +4,7 @@ export interface ICategory extends Document {
   _id: Types.ObjectId;
   name: string;
   slug: string;
-  companyId: Types.ObjectId | null;
+  companyId: Types.ObjectId;
   parentId: Types.ObjectId | null;
   isActive: boolean;
   createdAt: Date;
@@ -27,7 +27,7 @@ const categorySchema = new Schema<ICategory>(
     companyId: {
       type: Schema.Types.ObjectId,
       ref: 'Company',
-      default: null,
+      required: true,
       index: true,
     },
     parentId: {
@@ -45,7 +45,7 @@ const categorySchema = new Schema<ICategory>(
   }
 );
 
-// Slug unique within a company; global categories have companyId = null
+// Slug unique within a company
 categorySchema.index({ companyId: 1, slug: 1 }, { unique: true });
 
 categorySchema.set('toJSON', {

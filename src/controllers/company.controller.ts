@@ -230,3 +230,17 @@ export const getSellerStats = async (req: Request, res: Response) => {
       return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
   };
+  // ---------- PUBLIC: list all active companies (for homepage sellers section) ----------
+
+export const listActiveCompaniesPublic = async (_req: Request, res: Response) => {
+  try {
+    const companies = await Company.find({ isActive: true })
+      .select('_id name slug logoUrl')
+      .sort({ name: 1 });
+
+    return res.status(200).json({ ok: true, companies });
+  } catch (error) {
+    console.error('List active companies public error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
