@@ -9,22 +9,22 @@ import ProductVariant from '../models/ProductVariant.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
 
 // ---------- Validation ----------
-
 const placeOrderSchema = z.object({
-    buyer: z.object({
-    name: z.string().min(1).trim(),
-    email: z.string().email().toLowerCase().trim(),
-    phone: z.string().min(5).trim(),
-  }),
-  shippingAddress: z.object({
-    line1: z.string().min(1).trim(),
-    line2: z.string().trim().optional(),
-    city: z.string().min(1).trim(),
-    state: z.string().min(1).trim(),
-    pincode: z.string().min(1).trim(),
-    country: z.string().trim().default('India'),
-  }),
-  items: z
+  buyer: z.object({
+  name: z.string().min(1).trim(),
+  email: z.string().email().toLowerCase().trim(),
+  phone: z.string().min(5).trim(),
+}),
+shippingAddress: z.object({
+  line1: z.string().min(1).trim(),
+  line2: z.string().trim().optional(),
+  city: z.string().min(1).trim(),
+  state: z.string().min(1).trim(),
+  pincode: z.string().min(1).trim(),
+  country: z.string().trim().default('India'),
+}),
+paymentMethod: z.enum(['cod', 'online']).default('online'),
+items: z
     .array(
       z.object({
         productId: z.string(),
@@ -65,7 +65,7 @@ export const placeOrder = async (req: Request, res: Response) => {
         });
       }
   
-      const { buyer, shippingAddress, items, notes } = parsed.data;
+      const { buyer, shippingAddress, items, notes, paymentMethod } = parsed.data;
   
       // Step 1: Validate all items and gather full product/variant info
       type EnrichedItem = {
@@ -152,6 +152,7 @@ export const placeOrder = async (req: Request, res: Response) => {
           shippingFee,
           total,
           status: 'placed',
+          paymentMethod,
           paymentStatus: 'pending',
           notes,
         });

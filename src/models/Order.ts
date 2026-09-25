@@ -9,6 +9,8 @@ export type OrderStatus =
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
+export type PaymentMethod = 'cod' | 'online';
+
 export interface IOrder extends Document {
   _id: Types.ObjectId;
   companyId: Types.ObjectId;
@@ -30,6 +32,7 @@ export interface IOrder extends Document {
   shippingFee: number;
   total: number;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   paymentGatewayRef?: string;
   razorpayPaymentId?: string;
@@ -84,6 +87,11 @@ const orderSchema = new Schema<IOrder>(
       type: String,
       enum: ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled'],
       default: 'placed',
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['cod', 'online'],
+      default: 'online',
     },
     paymentStatus: {
       type: String,
