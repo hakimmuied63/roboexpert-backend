@@ -232,3 +232,31 @@ export const listProductsByCompanyCategory = async (req: Request, res: Response)
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+// ---------- PUBLIC: list all distinct category slugs across the marketplace ----------
+
+export const listMarketplaceCategories = async (_req: Request, res: Response) => {
+    try {
+      const categories = await Category.aggregate([
+        { $match: { isActive: true } },
+        {
+          $group: {
+            _id: '$slug',
+            name: { $first: '$name' },
+            slug: { $first: '$slug' },
+          },
+        },
+        { $sort: { name: 1 } },
+      ]);
+  
+      const result = categories.map((c) => ({
+        _id: c._id,
+        name: c.name,
+        slug: c.slug,
+      }));
+  
+      return res.status(200).json({ ok: true, categories: result });
+    } catch (error) {
+      console.error('List marketplace categories error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };

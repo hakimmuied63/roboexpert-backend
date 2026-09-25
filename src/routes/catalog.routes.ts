@@ -2,7 +2,6 @@ import { Router } from 'express';
 import {
   listCompanyProducts,
   listAllPublicProducts,
-  listPublicCategories,
   listProductsByCategory,
   searchProducts,
   getPublicProduct,
@@ -11,8 +10,10 @@ import {
 import {
   listCompanyCategoriesPublic,
   listProductsByCompanyCategory,
+  listMarketplaceCategories,
 } from '../controllers/category.controller.js';
 import { listActiveCompaniesPublic } from '../controllers/company.controller.js';
+
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get('/products/search', searchProducts);
 router.get('/products/:productId', getPublicProductById);
 
 // Legacy global categories (kept for now, but no longer used)
-router.get('/categories', listPublicCategories);
+router.get('/categories', listMarketplaceCategories);
 router.get('/categories/:slug/products', listProductsByCategory);
 
 // Companies (public list)

@@ -367,55 +367,61 @@ export const getPublicProductById = async (req: Request, res: Response) => {
       return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
   };
-  // ---------- PUBLIC: list products by category slug ----------
+ // ---------- PUBLIC: list products by category slug (across all sellers) ----------
 
 export const listProductsByCategory = async (req: Request, res: Response) => {
-    try {
-      const { slug } = req.params;
-  
-      const category = await Category.findOne({
-        slug,
-        companyId: null,
-        isActive: true,
-      });
-      if (!category) {
-        return res.status(404).json({ ok: false, error: 'Category not found' });
-      }
-  
-      const products = await Product.find({
-        categoryId: category._id,
-        isActive: true,
-      }).sort({ createdAt: -1 });
-  
-      const companyIds = [...new Set(products.map((p) => p.companyId.toString()))];
-      const companies = await Company.find({ _id: { $in: companyIds } }).select(
-        '_id name slug'
-      );
-  
-      const companyMap: Record<string, { _id: string; name: string; slug: string }> = {};
-      companies.forEach((c) => {
-        companyMap[c._id.toString()] = {
-          _id: c._id.toString(),
-          name: c.name,
-          slug: c.slug,
-        };
-      });
-  
-      const productsWithCompany = products.map((p) => ({
-        ...p.toJSON(),
-        company: companyMap[p.companyId.toString()] ?? null,
-      }));
-  
-      return res.status(200).json({
-        ok: true,
-        category: { _id: category._id, name: category.name, slug: category.slug },
-        products: productsWithCompany,
-      });
-    } catch (error) {
-      console.error('List products by category error:', error);
-      return res.status(500).json({ ok: false, error: 'Internal server error' });
+  try {
+    const { slug } = req.params;
+
+    // Find all categories with this slug (from any company)
+    const categories = await Category.find({
+      slug,
+      isActive: true,
+    });
+
+    if (categories.length === 0) {
+      return res.status(404).json({ ok: false, error: 'Category not found' });
     }
-  };
+
+    const categoryIds = categories.map((c) => c._id);
+
+    const products = await Product.find({
+      categoryId: { $in: categoryIds },
+      isActive: true,
+    }).sort({ createdAt: -1 });
+
+    const companyIds = [...new Set(products.map((p) => p.companyId.toString()))];
+    const companies = await Company.find({ _id: { $in: companyIds } }).select(
+      '_id name slug'
+    );
+
+    const companyMap: Record<string, { _id: string; name: string; slug: string }> = {};
+    companies.forEach((c) => {
+      companyMap[c._id.toString()] = {
+        _id: c._id.toString(),
+        name: c.name,
+        slug: c.slug,
+      };
+    });
+
+    const productsWithCompany = products.map((p) => ({
+      ...p.toJSON(),
+      company: companyMap[p.companyId.toString()] ?? null,
+    }));
+
+    // Use the first category's name for the header (they all share the slug)
+    const displayName = categories[0].name;
+
+    return res.status(200).json({
+      ok: true,
+      category: { _id: categoryIds[0], name: displayName, slug },
+      products: productsWithCompany,
+    });
+  } catch (error) {
+    console.error('List products by category error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
   // ---------- PUBLIC: search products by keyword ----------
 
 export const searchProducts = async (req: Request, res: Response) => {
