@@ -11,7 +11,9 @@ export interface IUser extends Document {
   name: string;
   phone?: string;
   isActive: boolean;
-  refreshTokenHash?: string;
+  refreshTokenHash?: string | null;
+  passwordResetToken?: string | null;
+  passwordResetExpires?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +58,14 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: null,
     },
+    passwordResetToken: {
+      type: String,
+      default: null,
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -66,11 +76,12 @@ userSchema.set('toJSON', {
   transform: (_doc, ret) => {
     delete (ret as any).passwordHash;
     delete (ret as any).refreshTokenHash;
+    delete (ret as any).passwordResetToken;
+    delete (ret as any).passwordResetExpires;
     delete (ret as any).__v;
     return ret;
   },
 });
-
 const User: Model<IUser> = mongoose.model<IUser>('User', userSchema);
 
 export default User;

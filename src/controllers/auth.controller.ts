@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import {
@@ -189,3 +190,100 @@ const refreshSchema = z.object({
       return res.status(500).json({ ok: false, error: 'Internal server error' });
     }
   };
+  // ---------- Forgot Password ----------
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email().toLowerCase().trim(),
+});
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: 'Valid email required' });
+    }
+
+    const { email } = parsed.data;
+
+    const user = await User.findOne({ email });
+
+    // Always return success, even if user not found (security — don't leak which emails exist)
+    if (!user) {
+      return res.status(200).json({
+        ok: true,
+        message: 'If that email exists, a reset link has been sent.',
+      });
+    }
+
+    // Generate a random token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    // Save hashed token + expiry (1 hour) on user
+    user.passwordResetToken = hashedToken;
+    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save();
+
+    // TODO: send email with rawToken to user.email
+    // For now, return the token in the response (dev only)
+    return res.status(200).json({
+      ok: true,
+      message: 'If that email exists, a reset link has been sent.',
+      devToken: rawToken, // dev only — remove before production
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+
+// ---------- Reset Password ----------
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { token, newPassword } = parsed.data;
+
+    // Hash incoming token and look up user
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ ok: false, error: 'Invalid or expired token' });
+    }
+
+    // Update password
+    user.passwordHash = await hashPassword(newPassword);
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+
+    // Invalidate all refresh tokens (force re-login on all devices)
+    user.refreshTokenHash = null;
+    await user.save();
+
+    return res.status(200).json({
+      ok: true,
+      message: 'Password reset successfully. Please log in.',
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
