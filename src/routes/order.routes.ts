@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   placeOrder,
   trackOrder,
+  cancelOrder,
+  requestReturn,
   listMyOrders,
   getMyOrder,
   updateOrderStatus,
@@ -12,9 +14,11 @@ import { requireAuth, requireAdmin, requireSeller } from '../middleware/auth.mid
 
 const router = Router();
 
-// Public — buyer actions
+// Public — buyer actions (verified by email for some)
 router.post('/', placeOrder);
 router.get('/track/:orderNumber', trackOrder);
+router.post('/track/:orderNumber/cancel', cancelOrder);
+router.post('/track/:orderNumber/return', requestReturn);
 
 // Seller
 router.get('/my', requireAuth, requireSeller, listMyOrders);

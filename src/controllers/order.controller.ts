@@ -201,13 +201,26 @@ export const placeOrder = async (req: Request, res: Response) => {
   };
   // ---------- PUBLIC: Track order by order number ----------
 
-export const trackOrder = async (req: Request, res: Response) => {
+  export const trackOrder = async (req: Request, res: Response) => {
     try {
       const { orderNumber } = req.params;
+      const email = typeof req.query.email === 'string' ? req.query.email.trim().toLowerCase() : '';
   
-      const order = await Order.findOne({ orderNumber });
+      if (!email) {
+        return res.status(400).json({ ok: false, error: 'Email is required to look up an order' });
+      }
+  
+      const order = await Order.findOne({
+        orderNumber,
+        'buyer.email': email,
+      });
+  
+      // Return 404 for both "order not found" and "email mismatch" — don't leak which
       if (!order) {
-        return res.status(404).json({ ok: false, error: 'Order not found' });
+        return res.status(404).json({
+          ok: false,
+          error: 'No order found with that order number and email',
+        });
       }
   
       const items = await OrderItem.find({ orderId: order._id });
@@ -349,6 +362,156 @@ export const getAnyOrder = async (req: Request, res: Response) => {
     return res.status(200).json({ ok: true, order, items });
   } catch (error) {
     console.error('Get any order error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+// ---------- PUBLIC: Cancel an order (buyer, verified by email) ----------
+
+const cancelOrderSchema = z.object({
+  email: z.string().email().toLowerCase().trim(),
+  reason: z.string().min(1).trim(),
+  note: z.string().trim().optional(),
+});
+
+export const cancelOrder = async (req: Request, res: Response) => {
+  try {
+    const { orderNumber } = req.params;
+    const parsed = cancelOrderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { email, reason, note } = parsed.data;
+
+    const order = await Order.findOne({
+      orderNumber,
+      'buyer.email': email,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        ok: false,
+        error: 'No order found with that order number and email',
+      });
+    }
+
+    // Can only cancel if not shipped/delivered/cancelled
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ ok: false, error: 'Order is already cancelled' });
+    }
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      return res.status(400).json({
+        ok: false,
+        error: `Order cannot be cancelled once it's ${order.status}`,
+      });
+    }
+
+    // Update order
+    order.status = 'cancelled';
+    order.cancelledAt = new Date();
+    order.cancellationReason = reason;
+    order.cancellationNote = note ?? null;
+    await order.save();
+
+    // Restore stock for each variant in the order
+    const items = await OrderItem.find({ orderId: order._id });
+    for (const item of items) {
+      await ProductVariant.findByIdAndUpdate(item.variantId, {
+        $inc: { stock: item.quantity },
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      order,
+      message: 'Order cancelled successfully',
+    });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+// ---------- PUBLIC: Request return (buyer, verified by email) ----------
+
+const requestReturnSchema = z.object({
+  email: z.string().email().toLowerCase().trim(),
+  reason: z.string().min(1).trim(),
+  note: z.string().trim().optional(),
+});
+
+export const requestReturn = async (req: Request, res: Response) => {
+  try {
+    const { orderNumber } = req.params;
+    const parsed = requestReturnSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const { email, reason, note } = parsed.data;
+
+    const order = await Order.findOne({
+      orderNumber,
+      'buyer.email': email,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        ok: false,
+        error: 'No order found with that order number and email',
+      });
+    }
+
+    // Can only request return if delivered
+    if (order.status !== 'delivered') {
+      return res.status(400).json({
+        ok: false,
+        error: 'Returns can only be requested for delivered orders',
+      });
+    }
+
+    // Already requested?
+    if (order.returnStatus) {
+      return res.status(400).json({
+        ok: false,
+        error: `Return already ${order.returnStatus}`,
+      });
+    }
+
+    // Check 7-day window from delivery
+    // Since we don't track deliveredAt separately, use updatedAt as proxy
+    const deliveredAt = order.updatedAt ?? order.createdAt;
+    const daysSinceDelivery =
+      (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysSinceDelivery > 7) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Return window has expired (7 days from delivery)',
+      });
+    }
+
+    // Create the return request
+    order.returnStatus = 'requested';
+    order.returnReason = reason;
+    order.returnNote = note ?? null;
+    order.returnRequestedAt = new Date();
+    await order.save();
+
+    return res.status(200).json({
+      ok: true,
+      order,
+      message: 'Return requested successfully. The seller will review your request.',
+    });
+  } catch (error) {
+    console.error('Request return error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };

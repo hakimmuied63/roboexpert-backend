@@ -11,6 +11,12 @@ export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
 export type PaymentMethod = 'cod' | 'online';
 
+export type ReturnStatus =
+  | 'requested'
+  | 'approved'
+  | 'rejected'
+  | 'completed';
+
 export interface IOrder extends Document {
   _id: Types.ObjectId;
   companyId: Types.ObjectId;
@@ -37,6 +43,19 @@ export interface IOrder extends Document {
   paymentGatewayRef?: string;
   razorpayPaymentId?: string;
   notes?: string;
+
+  // Cancellation
+  cancelledAt?: Date | null;
+  cancellationReason?: string | null;
+  cancellationNote?: string | null;
+
+  // Returns
+  returnStatus?: ReturnStatus | null;
+  returnReason?: string | null;
+  returnNote?: string | null;
+  returnRequestedAt?: Date | null;
+  returnResolvedAt?: Date | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,6 +128,43 @@ const orderSchema = new Schema<IOrder>(
     notes: {
       type: String,
       trim: true,
+    },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+    cancellationReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    cancellationNote: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    returnStatus: {
+      type: String,
+      enum: ['requested', 'approved', 'rejected', 'completed', null],
+      default: null,
+    },
+    returnReason: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    returnNote: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    returnRequestedAt: {
+      type: Date,
+      default: null,
+    },
+    returnResolvedAt: {
+      type: Date,
+      default: null,
     },
   },
   {
