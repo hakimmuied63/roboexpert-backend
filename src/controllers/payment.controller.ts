@@ -7,6 +7,12 @@ import Payment from '../models/Payment.js';
 import SellerPaymentConfig from '../models/SellerPaymentConfig.js';
 import { createRazorpayOrder } from '../services/razorpay.service.js';
 import { decrypt } from '../utils/encryption.js';
+import OrderItem from '../models/OrderItem.js';
+import Company from '../models/Company.js';
+import {
+  sendOrderConfirmationToBuyer,
+  sendNewOrderToSeller,
+} from '../services/email.service.js';
 // ---------- Validation ----------
 
 const createPaymentOrderSchema = z.object({
@@ -148,6 +154,42 @@ export const verifyPayment = async (req: Request, res: Response) => {
       gatewayPaymentId: razorpayPaymentId,
       status: 'captured',
     });
+           // Send order confirmation emails now that payment is confirmed
+    try {
+      const items = await OrderItem.find({ orderId: order._id });
+      const company = await Company.findById(order.companyId);
+
+      if (company) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const emailData = {
+          orderNumber: order.orderNumber,
+          buyerName: order.buyer?.name ?? 'Customer',
+          buyerEmail: order.buyer?.email ?? '',
+          sellerName: company.name,
+          sellerEmail: company.contactEmail,
+          items: items.map((i) => ({
+            name: i.productSnapshot?.name ?? 'Item',
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+          })),
+          total: order.total,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          shippingAddress: order.shippingAddress,
+          trackUrl: `${frontendUrl}/track-order?order=${order.orderNumber}`,
+          cancelUrl: `${frontendUrl}/track-order?order=${order.orderNumber}&action=cancel`,
+        };
+    
+            Promise.all([
+              sendOrderConfirmationToBuyer(emailData),
+              sendNewOrderToSeller(emailData),
+            ]).catch((err) => {
+              console.error('[email] Post-payment notification failed:', err);
+            });
+          }
+        } catch (err) {
+          console.error('[email] Post-payment email setup failed:', err);
+        }
 
     return res.status(200).json({ ok: true, message: 'Payment verified' });
   } catch (error) {

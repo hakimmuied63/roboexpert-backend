@@ -7,6 +7,15 @@ import Company from '../models/Company.js';
 import Product from '../models/Product.js';
 import ProductVariant from '../models/ProductVariant.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
+import {
+  sendOrderConfirmationToBuyer,
+  sendNewOrderToSeller,
+  sendOrderShippedToBuyer,
+  sendOrderDeliveredToBuyer,
+  sendOrderCancelledToBuyer,
+  sendOrderCancelledToSeller,
+  sendReturnRequestedToSeller,
+} from '../services/email.service.js';
 
 // ---------- Validation ----------
 const placeOrderSchema = z.object({
@@ -39,6 +48,32 @@ items: z
 const updateStatusSchema = z.object({
   status: z.enum(['confirmed', 'shipped', 'delivered', 'cancelled']),
 });
+
+// ---------- Helper: build the email payload for an order ----------
+const buildOrderEmailData = (order: any, items: any[], company: any) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const trackUrl = `${frontendUrl}/track-order?order=${order.orderNumber}`;
+  const cancelUrl = `${frontendUrl}/track-order?order=${order.orderNumber}&email=${encodeURIComponent(order.buyer.email)}&action=cancel`;
+
+  return {
+    orderNumber: order.orderNumber,
+    buyerName: order.buyer?.name ?? 'Customer',
+    buyerEmail: order.buyer?.email ?? '',
+    sellerName: company.name,
+    sellerEmail: company.contactEmail,
+    items: items.map((i) => ({
+      name: i.productSnapshot?.name ?? 'Item',
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+    })),
+    total: order.total,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    shippingAddress: order.shippingAddress,
+    trackUrl,
+    cancelUrl,
+  };
+};
 
 // ---------- Helper: unique order number ----------
 
@@ -181,6 +216,24 @@ export const placeOrder = async (req: Request, res: Response) => {
             $inc: { stock: -i.quantity },
           });
         }
+                // Send email notifications (fire and forget — don't block response)
+                const emailData = buildOrderEmailData(order, createdItems, company);
+
+                // Only send order confirmation email if the order is paid OR it's COD
+                // (For online payments, we wait until payment is verified to send confirmation)
+                if (paymentMethod === 'cod' || order.paymentStatus === 'paid') {
+                  Promise.all([
+                    sendOrderConfirmationToBuyer(emailData),
+                    sendNewOrderToSeller(emailData),
+                  ]).catch((err) => {
+                    console.error('[email] Order notification failed:', err);
+                  });
+                } else {
+                  // Still notify the seller that an order was placed (they need to see it)
+                  sendNewOrderToSeller(emailData).catch((err) => {
+                    console.error('[email] Seller new-order email failed:', err);
+                  });
+                }
   
         createdOrders.push({
           order,
@@ -286,7 +339,6 @@ export const getMyOrder = async (req: Request, res: Response) => {
 };
 
 // ---------- SELLER: Update order status ----------
-
 export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     if (!req.user || req.user.role !== 'seller') {
@@ -307,6 +359,16 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       });
     }
 
+    const existing = await Order.findOne({
+      _id: orderId,
+      companyId: req.user.companyId,
+    }).select('status');
+    if (!existing) {
+      return res.status(404).json({ ok: false, error: 'Order not found' });
+    }
+
+    const previousStatus = existing.status;
+
     const order = await Order.findOneAndUpdate(
       { _id: orderId, companyId: req.user.companyId },
       { $set: { status: parsed.data.status } },
@@ -314,6 +376,40 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     );
     if (!order) {
       return res.status(404).json({ ok: false, error: 'Order not found' });
+    }
+
+    // Send status-change emails (fire and forget)
+    const newStatus = parsed.data.status;
+
+    if (previousStatus !== newStatus) {
+      (async () => {
+        try {
+          const items = await OrderItem.find({ orderId: order._id });
+          const company = await Company.findById(order.companyId);
+          if (!company) return;
+
+          const emailData = buildOrderEmailData(order, items, company);
+
+          if (newStatus === 'shipped') {
+            await sendOrderShippedToBuyer(emailData);
+          } else if (newStatus === 'delivered') {
+            await sendOrderDeliveredToBuyer(emailData);
+          } else if (newStatus === 'cancelled') {
+            await Promise.all([
+              sendOrderCancelledToBuyer(
+                emailData,
+                order.cancellationReason ?? undefined
+              ),
+              sendOrderCancelledToSeller(
+                emailData,
+                order.cancellationReason ?? undefined
+              ),
+            ]);
+          }
+        } catch (err) {
+          console.error('[email] Status-change notification failed:', err);
+        }
+      })();
     }
 
     return res.status(200).json({ ok: true, order });
@@ -425,6 +521,24 @@ export const cancelOrder = async (req: Request, res: Response) => {
       });
     }
 
+    // Send cancellation emails (fire and forget)
+    (async () => {
+      try {
+        const company = await Company.findById(order.companyId);
+        if (!company) return;
+
+        const emailData = buildOrderEmailData(order, items, company);
+        const reasonText = reason || order.cancellationReason || undefined;
+
+        await Promise.all([
+          sendOrderCancelledToBuyer(emailData, reasonText),
+          sendOrderCancelledToSeller(emailData, reasonText),
+        ]);
+      } catch (err) {
+        console.error('[email] Cancellation notification failed:', err);
+      }
+    })();
+
     return res.status(200).json({
       ok: true,
       order,
@@ -486,7 +600,6 @@ export const requestReturn = async (req: Request, res: Response) => {
     }
 
     // Check 7-day window from delivery
-    // Since we don't track deliveredAt separately, use updatedAt as proxy
     const deliveredAt = order.updatedAt ?? order.createdAt;
     const daysSinceDelivery =
       (Date.now() - new Date(deliveredAt).getTime()) / (1000 * 60 * 60 * 24);
@@ -504,6 +617,22 @@ export const requestReturn = async (req: Request, res: Response) => {
     order.returnNote = note ?? null;
     order.returnRequestedAt = new Date();
     await order.save();
+
+    // Send return-requested email to seller (fire and forget)
+    (async () => {
+      try {
+        const items = await OrderItem.find({ orderId: order._id });
+        const company = await Company.findById(order.companyId);
+        if (!company) return;
+
+        const emailData = buildOrderEmailData(order, items, company);
+        const reasonText = note ? `${reason} — ${note}` : reason;
+
+        await sendReturnRequestedToSeller(emailData, reasonText);
+      } catch (err) {
+        console.error('[email] Return-requested notification failed:', err);
+      }
+    })();
 
     return res.status(200).json({
       ok: true,
