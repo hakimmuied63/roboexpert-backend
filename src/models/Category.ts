@@ -6,6 +6,7 @@ export interface ICategory extends Document {
   slug: string;
   companyId: Types.ObjectId;
   parentId: Types.ObjectId | null;
+  packagingCharge: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +35,11 @@ const categorySchema = new Schema<ICategory>(
       type: Schema.Types.ObjectId,
       ref: 'Category',
       default: null,
+    },
+    packagingCharge: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     isActive: {
       type: Boolean,

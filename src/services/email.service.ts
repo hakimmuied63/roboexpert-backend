@@ -321,3 +321,167 @@ export const sendReturnDecisionToBuyer = async (
     replyTo: order.sellerEmail,
   });
 };
+// ---------- Admin: New Seller Signup Notification ----------
+
+export const sendNewSellerAlertToAdmin = async (seller: {
+    name: string;
+    email: string;
+    phone?: string;
+    companyName?: string;
+  }): Promise<SendResult> => {
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL;
+  
+    if (!adminEmail) {
+      console.warn('[email] ADMIN_NOTIFICATION_EMAIL not set — skipping admin alert');
+      return { ok: false, error: 'Admin email not configured' };
+    }
+  
+    const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+        <h1 style="font-size:22px;">New seller awaiting approval</h1>
+        <p style="color:#4b5563;">A new seller has signed up on RoboExpert and needs your review.</p>
+        <table style="width:100%;margin-top:16px;font-size:14px;border-collapse:collapse;">
+          <tr>
+            <td style="padding:8px 0;color:#6b7280;">Name:</td>
+            <td style="padding:8px 0;font-weight:600;">${escapeHtml(seller.name)}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#6b7280;">Email:</td>
+            <td style="padding:8px 0;">${escapeHtml(seller.email)}</td>
+          </tr>
+          ${
+            seller.phone
+              ? `<tr>
+                  <td style="padding:8px 0;color:#6b7280;">Phone:</td>
+                  <td style="padding:8px 0;">${escapeHtml(seller.phone)}</td>
+                </tr>`
+              : ''
+          }
+          ${
+            seller.companyName
+              ? `<tr>
+                  <td style="padding:8px 0;color:#6b7280;">Business:</td>
+                  <td style="padding:8px 0;">${escapeHtml(seller.companyName)}</td>
+                </tr>`
+              : ''
+          }
+        </table>
+        <p style="margin-top:24px;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/sellers" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+            Review in Admin Panel
+          </a>
+        </p>
+        <p style="margin-top:24px;color:#6b7280;font-size:12px;">
+          You're receiving this because you're an admin on RoboExpert.
+        </p>
+      </div>
+    `;
+  
+    return sendEmail({
+      to: adminEmail,
+      subject: `New seller signup: ${seller.name}`,
+      html,
+    });
+  };
+  // ---------- Seller: Approval / Rejection / Suspension Notifications ----------
+
+export const sendSellerApprovedEmail = async (seller: {
+    name: string;
+    email: string;
+    companyName?: string;
+  }): Promise<SendResult> => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
+    const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+        <h1 style="font-size:22px;">🎉 You're approved!</h1>
+        <p style="color:#4b5563;">
+          Hi ${escapeHtml(seller.name)}, your seller account${seller.companyName ? ` for <strong>${escapeHtml(seller.companyName)}</strong>` : ''} has been approved.
+        </p>
+        <p style="color:#4b5563;">
+          You can now start listing products and selling on RoboExpert. Your storefront is live.
+        </p>
+        <p style="margin-top:24px;">
+          <a href="${frontendUrl}/seller" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+            Go to Seller Dashboard
+          </a>
+        </p>
+        <p style="margin-top:24px;color:#6b7280;font-size:12px;">
+          Thanks for joining RoboExpert.
+        </p>
+      </div>
+    `;
+  
+    return sendEmail({
+      to: seller.email,
+      subject: `You're approved — start selling on RoboExpert`,
+      html,
+    });
+  };
+  
+  export const sendSellerRejectedEmail = async (seller: {
+    name: string;
+    email: string;
+    reason: string;
+  }): Promise<SendResult> => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
+    const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+        <h1 style="font-size:22px;">Seller application needs attention</h1>
+        <p style="color:#4b5563;">Hi ${escapeHtml(seller.name)},</p>
+        <p style="color:#4b5563;">
+          Unfortunately, your seller application could not be approved at this time.
+        </p>
+        <div style="margin-top:16px;padding:16px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:8px;">
+          <p style="margin:0;font-size:13px;color:#7f1d1d;"><strong>Reason:</strong></p>
+          <p style="margin:4px 0 0 0;font-size:14px;color:#991b1b;">${escapeHtml(seller.reason)}</p>
+        </div>
+        <p style="color:#4b5563;margin-top:16px;">
+          If you believe this is a mistake or want to re-apply with the changes, please contact support.
+        </p>
+        <p style="margin-top:24px;">
+          <a href="${frontendUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+            Back to RoboExpert
+          </a>
+        </p>
+      </div>
+    `;
+  
+    return sendEmail({
+      to: seller.email,
+      subject: `RoboExpert seller application update`,
+      html,
+    });
+  };
+  
+  export const sendSellerSuspendedEmail = async (seller: {
+    name: string;
+    email: string;
+    reason: string;
+  }): Promise<SendResult> => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  
+    const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+        <h1 style="font-size:22px;">Account suspended</h1>
+        <p style="color:#4b5563;">Hi ${escapeHtml(seller.name)},</p>
+        <p style="color:#4b5563;">
+          Your RoboExpert seller account has been suspended.
+        </p>
+        <div style="margin-top:16px;padding:16px;background:#fef2f2;border-left:4px solid #dc2626;border-radius:8px;">
+          <p style="margin:0;font-size:13px;color:#7f1d1d;"><strong>Reason:</strong></p>
+          <p style="margin:4px 0 0 0;font-size:14px;color:#991b1b;">${escapeHtml(seller.reason)}</p>
+        </div>
+        <p style="color:#4b5563;margin-top:16px;">
+          To appeal this decision, please contact our support team.
+        </p>
+      </div>
+    `;
+  
+    return sendEmail({
+      to: seller.email,
+      subject: `RoboExpert account suspended`,
+      html,
+    });
+  };

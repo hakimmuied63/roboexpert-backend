@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import OrderItem from '../models/OrderItem.js';
 import Company from '../models/Company.js';
+import Category from '../models/Category.js';
 import Product from '../models/Product.js';
 import ProductVariant from '../models/ProductVariant.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
@@ -109,6 +110,7 @@ export const placeOrder = async (req: Request, res: Response) => {
         quantity: number;
         lineTotal: number;
         companyId: string;
+        categoryId: string | null;
       };
   
       const enriched: EnrichedItem[] = [];
@@ -152,6 +154,7 @@ export const placeOrder = async (req: Request, res: Response) => {
           quantity: item.quantity,
           lineTotal: variant.price * item.quantity,
           companyId: product.companyId.toString(),
+          categoryId: product.categoryId ? product.categoryId.toString() : null,
         });
       }
   
@@ -172,12 +175,55 @@ export const placeOrder = async (req: Request, res: Response) => {
             .status(404)
             .json({ ok: false, error: `Store not found: ${companyId}` });
         }
-  
+
         const subtotal = companyItems.reduce((sum, i) => sum + i.lineTotal, 0);
         const shippingFee = 0;
-        const total = subtotal + shippingFee;
+
+        // ---------- Packaging calculation (per unique subcategory) ----------
+        const uniqueCategoryIds = [
+          ...new Set(
+            companyItems
+              .map((i) => i.categoryId)
+              .filter((id): id is string => !!id)
+          ),
+        ];
+
+        let packagingFee = 0;
+
+        if (uniqueCategoryIds.length > 0) {
+          const categories = await Category.find({
+            _id: { $in: uniqueCategoryIds },
+          });
+
+          const parentIds = [
+            ...new Set(
+              categories
+                .map((c) => c.parentId?.toString())
+                .filter((id): id is string => !!id)
+            ),
+          ];
+          const parents = parentIds.length
+            ? await Category.find({ _id: { $in: parentIds } })
+            : [];
+          const parentMap: Record<string, any> = {};
+          parents.forEach((p) => {
+            parentMap[p._id.toString()] = p;
+          });
+
+          for (const cat of categories) {
+            let charge = cat.packagingCharge ?? 0;
+            if (!charge && cat.parentId) {
+              const parent = parentMap[cat.parentId.toString()];
+              charge = parent?.packagingCharge ?? 0;
+            }
+            packagingFee += charge;
+          }
+        }
+        // ---------- End packaging calculation ----------
+
+        const total = subtotal + shippingFee + packagingFee;
         const orderNumber = await createUniqueOrderNumber();
-  
+
         const order = await Order.create({
           companyId,
           orderNumber,
@@ -185,6 +231,7 @@ export const placeOrder = async (req: Request, res: Response) => {
           shippingAddress,
           subtotal,
           shippingFee,
+          packagingFee,
           total,
           status: 'placed',
           paymentMethod,

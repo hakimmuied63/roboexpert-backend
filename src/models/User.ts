@@ -11,6 +11,10 @@ export interface IUser extends Document {
   name: string;
   phone?: string;
   isActive: boolean;
+  approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
+  approvalNote?: string | null;
+  approvedAt?: Date | null;
+  approvedBy?: Types.ObjectId | null;
   refreshTokenHash?: string | null;
   passwordResetToken?: string | null;
   passwordResetExpires?: Date | null;
@@ -53,6 +57,24 @@ const userSchema = new Schema<IUser>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected', 'suspended'],
+      default: 'approved',
+    },
+    approvalNote: {
+      type: String,
+      default: null,
+    },
+    approvedAt: {
+      type: Date,
+      default: null,
+    },
+    approvedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
     refreshTokenHash: {
       type: String,

@@ -36,6 +36,7 @@ export interface IOrder extends Document {
   };
   subtotal: number;
   shippingFee: number;
+  packagingFee: number;
   total: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
@@ -93,6 +94,11 @@ const orderSchema = new Schema<IOrder>(
       min: 0,
     },
     shippingFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    packagingFee: {
       type: Number,
       default: 0,
       min: 0,

@@ -8,6 +8,7 @@ import {
   generateRefreshToken,
   hashRefreshToken,
 } from '../utils/jwt.js';
+import { sendNewSellerAlertToAdmin } from '../services/email.service.js';
 // ---------- Validation schema ----------
 
 const signupSchema = z.object({
@@ -46,6 +47,8 @@ export const signup = async (req: Request, res: Response) => {
       name,
       role,
       phone,
+      // Sellers start as pending — admins auto-approve themselves
+      approvalStatus: role === 'seller' ? 'pending' : 'approved',
     });
 
     const accessToken = signAccessToken({
@@ -56,6 +59,17 @@ export const signup = async (req: Request, res: Response) => {
     const refreshToken = generateRefreshToken();
     user.refreshTokenHash = hashRefreshToken(refreshToken);
     await user.save();
+
+    // Fire-and-forget: notify admin when a new seller signs up
+    if (role === 'seller') {
+      sendNewSellerAlertToAdmin({
+        name,
+        email,
+        phone,
+      }).catch((err) => {
+        console.error('[email] Admin new-seller alert failed:', err);
+      });
+    }
 
     return res.status(201).json({
       ok: true,

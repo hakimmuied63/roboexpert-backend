@@ -369,7 +369,7 @@ export const getPublicProductById = async (req: Request, res: Response) => {
   };
  // ---------- PUBLIC: list products by category slug (across all sellers) ----------
 
-export const listProductsByCategory = async (req: Request, res: Response) => {
+ export const listProductsByCategory = async (req: Request, res: Response) => {
   try {
     const { slug } = req.params;
 
@@ -383,10 +383,22 @@ export const listProductsByCategory = async (req: Request, res: Response) => {
       return res.status(404).json({ ok: false, error: 'Category not found' });
     }
 
-    const categoryIds = categories.map((c) => c._id);
+    const rootCategoryIds = categories.map((c) => c._id);
+
+    // Find all subcategories (children) of these root categories
+    const subCategories = await Category.find({
+      parentId: { $in: rootCategoryIds },
+      isActive: true,
+    });
+
+    // Combine root + subcategory IDs so clicking a parent shows products in subcategories too
+    const allCategoryIds = [
+      ...rootCategoryIds,
+      ...subCategories.map((c) => c._id),
+    ];
 
     const products = await Product.find({
-      categoryId: { $in: categoryIds },
+      categoryId: { $in: allCategoryIds },
       isActive: true,
     }).sort({ createdAt: -1 });
 
@@ -409,12 +421,11 @@ export const listProductsByCategory = async (req: Request, res: Response) => {
       company: companyMap[p.companyId.toString()] ?? null,
     }));
 
-    // Use the first category's name for the header (they all share the slug)
     const displayName = categories[0].name;
 
     return res.status(200).json({
       ok: true,
-      category: { _id: categoryIds[0], name: displayName, slug },
+      category: { _id: rootCategoryIds[0], name: displayName, slug },
       products: productsWithCompany,
     });
   } catch (error) {
