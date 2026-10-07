@@ -17,6 +17,7 @@ import {
   adminUpdatePackagingCharge,
 } from '../controllers/admin.controller.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware.js';
+import { adminListLeads, adminDeleteLead } from '../controllers/lead.controller.js';
 
 const router = Router();
 
@@ -49,5 +50,9 @@ router.post('/sellers/:userId/suspend', adminSuspendSeller);
 // Category Packaging Charges
 router.get('/categories', adminListCategories);
 router.patch('/categories/:categoryId/packaging', adminUpdatePackagingCharge);
+
+// Leads (Lead Capture Popup)
+router.get('/leads', adminListLeads);
+router.delete('/leads/:leadId', adminDeleteLead);
 
 export default router;
