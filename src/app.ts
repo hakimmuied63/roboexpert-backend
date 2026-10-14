@@ -11,11 +11,28 @@ import paymentRoutes from './routes/payment.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import leadRoutes from './routes/lead.routes.js';
+import uploadRoutes from './routes/upload.routes.js';
 
 const app: Application = express();
 
 // Middleware
-app.use(cors());
+// CORS — allow configured frontend + localhost for dev
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean) as string[];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -35,6 +52,7 @@ app.use('/products', productRoutes);
 app.use('/categories', categoryRoutes);
 app.use('/chat', chatRoutes);
 app.use('/leads', leadRoutes);
+app.use('/upload', uploadRoutes);
 app.use('/catalog', catalogRoutes);
 app.use('/orders', orderRoutes);
 app.use('/admin', adminRoutes);

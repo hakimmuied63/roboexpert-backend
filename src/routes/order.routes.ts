@@ -10,6 +10,10 @@ import {
   listAllOrders,
   getAnyOrder,
 } from '../controllers/order.controller.js';
+import {
+  downloadBuyerInvoice,
+  downloadSellerInvoice,
+} from '../controllers/invoice.controller.js';
 import { requireAuth, requireAdmin, requireSeller } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -17,12 +21,14 @@ const router = Router();
 // Public — buyer actions (verified by email for some)
 router.post('/', placeOrder);
 router.get('/track/:orderNumber', trackOrder);
+router.get('/track/:orderNumber/invoice', downloadBuyerInvoice);
 router.post('/track/:orderNumber/cancel', cancelOrder);
 router.post('/track/:orderNumber/return', requestReturn);
 
 // Seller
 router.get('/my', requireAuth, requireSeller, listMyOrders);
 router.get('/my/:orderId', requireAuth, requireSeller, getMyOrder);
+router.get('/my/:orderId/invoice', requireAuth, requireSeller, downloadSellerInvoice);
 router.patch('/my/:orderId/status', requireAuth, requireSeller, updateOrderStatus);
 
 // Admin

@@ -45,6 +45,17 @@ export interface IOrder extends Document {
   razorpayPaymentId?: string;
   notes?: string;
 
+  // UTM Tracking
+  utm?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+    term?: string;
+    content?: string;
+    landingPage?: string;
+    referrer?: string;
+  };
+
   // Cancellation
   cancelledAt?: Date | null;
   cancellationReason?: string | null;
@@ -134,6 +145,15 @@ const orderSchema = new Schema<IOrder>(
     notes: {
       type: String,
       trim: true,
+    },
+    utm: {
+      source: { type: String, trim: true },
+      medium: { type: String, trim: true },
+      campaign: { type: String, trim: true },
+      term: { type: String, trim: true },
+      content: { type: String, trim: true },
+      landingPage: { type: String, trim: true },
+      referrer: { type: String, trim: true },
     },
     cancelledAt: {
       type: Date,

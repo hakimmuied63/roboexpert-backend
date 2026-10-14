@@ -19,22 +19,34 @@ import {
 } from '../services/email.service.js';
 
 // ---------- Validation ----------
+const utmSchema = z
+  .object({
+    source: z.string().max(200).trim().optional(),
+    medium: z.string().max(200).trim().optional(),
+    campaign: z.string().max(200).trim().optional(),
+    term: z.string().max(200).trim().optional(),
+    content: z.string().max(200).trim().optional(),
+    landingPage: z.string().max(500).trim().optional(),
+    referrer: z.string().max(500).trim().optional(),
+  })
+  .optional();
+
 const placeOrderSchema = z.object({
   buyer: z.object({
-  name: z.string().min(1).trim(),
-  email: z.string().email().toLowerCase().trim(),
-  phone: z.string().min(5).trim(),
-}),
-shippingAddress: z.object({
-  line1: z.string().min(1).trim(),
-  line2: z.string().trim().optional(),
-  city: z.string().min(1).trim(),
-  state: z.string().min(1).trim(),
-  pincode: z.string().min(1).trim(),
-  country: z.string().trim().default('India'),
-}),
-paymentMethod: z.enum(['cod', 'online']).default('online'),
-items: z
+    name: z.string().min(1).trim(),
+    email: z.string().email().toLowerCase().trim(),
+    phone: z.string().min(5).trim(),
+  }),
+  shippingAddress: z.object({
+    line1: z.string().min(1).trim(),
+    line2: z.string().trim().optional(),
+    city: z.string().min(1).trim(),
+    state: z.string().min(1).trim(),
+    pincode: z.string().min(1).trim(),
+    country: z.string().trim().default('India'),
+  }),
+  paymentMethod: z.enum(['cod', 'online']).default('online'),
+  items: z
     .array(
       z.object({
         productId: z.string(),
@@ -44,6 +56,7 @@ items: z
     )
     .min(1, 'At least one item required'),
   notes: z.string().trim().optional(),
+  utm: utmSchema,
 });
 
 const updateStatusSchema = z.object({
@@ -101,7 +114,7 @@ export const placeOrder = async (req: Request, res: Response) => {
         });
       }
   
-      const { buyer, shippingAddress, items, notes, paymentMethod } = parsed.data;
+      const { buyer, shippingAddress, items, notes, paymentMethod, utm } = parsed.data;
   
       // Step 1: Validate all items and gather full product/variant info
       type EnrichedItem = {
@@ -237,6 +250,7 @@ export const placeOrder = async (req: Request, res: Response) => {
           paymentMethod,
           paymentStatus: 'pending',
           notes,
+          utm,
         });
   
         const createdItems = await OrderItem.insertMany(

@@ -7,14 +7,15 @@ import {
   forgotPassword,
   resetPassword,
 } from '../controllers/auth.controller.js';
+import { authLimiter, signupLimiter } from '../middleware/rateLimiters.js';
 
 const router = Router();
 
-router.post('/signup', signup);
-router.post('/login', login);
+router.post('/signup', signupLimiter, signup);
+router.post('/login', authLimiter, login);
 router.post('/refresh', refresh);
 router.post('/logout', logout);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password', authLimiter, resetPassword);
 
 export default router;
