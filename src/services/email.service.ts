@@ -485,3 +485,41 @@ export const sendSellerApprovedEmail = async (seller: {
       html,
     });
   };
+  // ---------- OTP Email ----------
+
+export const sendOtpEmail = async (
+  email: string,
+  code: string,
+  purpose: string = 'checkout'
+): Promise<SendResult> => {
+  const purposeText =
+    purpose === 'checkout'
+      ? 'verify your order'
+      : purpose === 'signup'
+      ? 'verify your account'
+      : 'reset your password';
+
+  const html = `
+    <div style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
+      <h1 style="font-size:22px;">Your RoboExpert verification code</h1>
+      <p style="color:#4b5563;">Use this OTP to ${purposeText}:</p>
+      <div style="margin:24px 0;padding:24px;background:#f3f4f6;border-radius:12px;text-align:center;">
+        <p style="margin:0;font-size:36px;font-weight:bold;letter-spacing:8px;color:#4f46e5;">
+          ${code}
+        </p>
+      </div>
+      <p style="color:#6b7280;font-size:14px;">
+        This code expires in 10 minutes. Do not share it with anyone.
+      </p>
+      <p style="margin-top:24px;color:#9ca3af;font-size:12px;">
+        If you didn't request this code, you can safely ignore this email.
+      </p>
+    </div>
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: `Your RoboExpert verification code: ${code}`,
+    html,
+  });
+};

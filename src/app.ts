@@ -12,6 +12,7 @@ import categoryRoutes from './routes/category.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import otpRoutes from './routes/otp.routes.js';
 
 const app: Application = express();
 
@@ -58,6 +59,7 @@ app.use('/orders', orderRoutes);
 app.use('/admin', adminRoutes);
 app.use('/payment-config', paymentConfigRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/otp', otpRoutes);
 
 // 404 handler — must come after all routes
 app.use((_req: Request, res: Response) => {
