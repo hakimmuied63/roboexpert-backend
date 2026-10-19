@@ -58,3 +58,39 @@ export const createRazorpayOrder = async (
 
   return { razorpayOrderId: order.id, keyId };
 };
+
+/**
+ * Refund a Razorpay payment (full or partial).
+ * Uses the seller's Razorpay account — because the payment was captured
+ * on the seller's account during checkout.
+ *
+ * @param companyId          Seller's company ID (to load their Razorpay config)
+ * @param razorpayPaymentId  The Razorpay payment ID (pay_xxx) stored on our Order
+ * @param amountInRupees     Amount to refund, in rupees
+ */
+export const refundRazorpayPayment = async (
+  companyId: string,
+  razorpayPaymentId: string,
+  amountInRupees: number
+): Promise<{ refundId: string; status: string; amount: number }> => {
+  if (!razorpayPaymentId || !razorpayPaymentId.startsWith('pay_')) {
+    throw new Error('Invalid Razorpay payment ID');
+  }
+
+  if (!Number.isFinite(amountInRupees) || amountInRupees <= 0) {
+    throw new Error('Refund amount must be greater than zero');
+  }
+
+  const { client } = await getRazorpayClientForCompany(companyId);
+
+  const refund = await client.payments.refund(razorpayPaymentId, {
+    amount: Math.round(amountInRupees * 100), // paise
+    speed: 'normal',
+  });
+
+  return {
+    refundId: refund.id,
+    status: (refund as any).status ?? 'processed',
+    amount: amountInRupees,
+  };
+};

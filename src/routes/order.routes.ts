@@ -7,6 +7,7 @@ import {
   listMyOrders,
   getMyOrder,
   updateOrderStatus,
+  updateReturnStatus,
   listAllOrders,
   getAnyOrder,
 } from '../controllers/order.controller.js';
@@ -30,6 +31,7 @@ router.get('/my', requireAuth, requireSeller, listMyOrders);
 router.get('/my/:orderId', requireAuth, requireSeller, getMyOrder);
 router.get('/my/:orderId/invoice', requireAuth, requireSeller, downloadSellerInvoice);
 router.patch('/my/:orderId/status', requireAuth, requireSeller, updateOrderStatus);
+router.patch('/my/:orderId/return', requireAuth, requireSeller, updateReturnStatus);
 
 // Admin
 router.get('/', requireAuth, requireAdmin, listAllOrders);

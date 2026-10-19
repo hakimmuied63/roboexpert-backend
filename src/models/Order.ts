@@ -17,6 +17,8 @@ export type ReturnStatus =
   | 'rejected'
   | 'completed';
 
+export type RefundStatus = 'none' | 'pending' | 'completed' | 'failed';
+
 export interface IOrder extends Document {
   _id: Types.ObjectId;
   companyId: Types.ObjectId;
@@ -67,6 +69,13 @@ export interface IOrder extends Document {
   returnNote?: string | null;
   returnRequestedAt?: Date | null;
   returnResolvedAt?: Date | null;
+
+  // Refunds
+  refundStatus?: RefundStatus | null;
+  refundId?: string | null;
+  refundAmount?: number | null;
+  refundedAt?: Date | null;
+  refundFailureReason?: string | null;
 
   createdAt: Date;
   updatedAt: Date;
@@ -190,6 +199,30 @@ const orderSchema = new Schema<IOrder>(
     },
     returnResolvedAt: {
       type: Date,
+      default: null,
+    },
+    refundStatus: {
+      type: String,
+      enum: ['none', 'pending', 'completed', 'failed', null],
+      default: null,
+    },
+    refundId: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    refundAmount: {
+      type: Number,
+      min: 0,
+      default: null,
+    },
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+    refundFailureReason: {
+      type: String,
+      trim: true,
       default: null,
     },
   },
