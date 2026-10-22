@@ -12,6 +12,7 @@ import categoryRoutes from './routes/category.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import leadRoutes from './routes/lead.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
+import reviewRoutes from './routes/review.routes.js';
 import otpRoutes from './routes/otp.routes.js';
 
 const app: Application = express();
@@ -49,6 +50,7 @@ app.get('/health', (_req: Request, res: Response) => {
 // Routes
 app.use('/auth', authRoutes);
 app.use('/companies', companyRoutes);
+app.use('/', reviewRoutes);
 app.use('/products', productRoutes);
 app.use('/categories', categoryRoutes);
 app.use('/chat', chatRoutes);

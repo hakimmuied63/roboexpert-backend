@@ -10,6 +10,11 @@ export interface IProduct extends Document {
   basePrice: number;
   images: string[];
   isActive: boolean;
+
+  // Ratings (denormalized for fast listing)
+  ratingAverage: number;
+  ratingCount: number;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -54,6 +59,17 @@ const productSchema = new Schema<IProduct>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    ratingAverage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {
