@@ -185,6 +185,7 @@ export const reportReview = async (req: Request, res: Response) => {
     review.reported = true;
     review.reportedAt = new Date();
     review.reportedBy = new mongoose.Types.ObjectId(req.user.userId);
+    review.reportedByRole = req.user.role as 'buyer' | 'seller' | 'admin';
     review.reportReason = parsed.data.reason;
     await review.save();
 
@@ -194,3 +195,22 @@ export const reportReview = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+// ---------- AUTH: List reviews for the seller's products ----------
+
+export const listSellerReviews = async (req: Request, res: Response) => {
+    try {
+      if (!req.user || req.user.role !== 'seller' || !req.user.companyId) {
+        return res.status(403).json({ ok: false, error: 'Seller access required' });
+      }
+  
+      const reviews = await Review.find({ companyId: req.user.companyId })
+        .populate('productId', 'name images')
+        .sort({ createdAt: -1 })
+        .lean();
+  
+      return res.status(200).json({ ok: true, reviews });
+    } catch (error) {
+      console.error('List seller reviews error:', error);
+      return res.status(500).json({ ok: false, error: 'Internal server error' });
+    }
+  };

@@ -14,6 +14,8 @@ import leadRoutes from './routes/lead.routes.js';
 import uploadRoutes from './routes/upload.routes.js';
 import reviewRoutes from './routes/review.routes.js';
 import otpRoutes from './routes/otp.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
+import adminReviewRoutes from './routes/adminReview.routes.js';
 
 const app: Application = express();
 
@@ -35,6 +37,7 @@ app.use(
     credentials: true,
   })
 );
+app.use('/webhooks', webhookRoutes);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -59,6 +62,7 @@ app.use('/upload', uploadRoutes);
 app.use('/catalog', catalogRoutes);
 app.use('/orders', orderRoutes);
 app.use('/admin', adminRoutes);
+app.use('/admin/reviews', adminReviewRoutes);
 app.use('/payment-config', paymentConfigRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/otp', otpRoutes);

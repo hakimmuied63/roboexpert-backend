@@ -15,6 +15,7 @@ export interface IReview extends Document {
   reported: boolean;
   reportedAt?: Date | null;
   reportedBy?: Types.ObjectId | null;
+  reportedByRole?: 'buyer' | 'seller' | 'admin' | null;
   reportReason?: string | null;
   hidden: boolean;
 
@@ -85,6 +86,11 @@ const reviewSchema = new Schema<IReview>(
       ref: 'User',
       default: null,
     },
+    reportedByRole: {
+        type: String,
+        enum: ['buyer', 'seller', 'admin', null],
+        default: null,
+      },
     reportReason: {
       type: String,
       trim: true,
