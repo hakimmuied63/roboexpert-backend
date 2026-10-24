@@ -301,3 +301,20 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+// ---------- Rollback: Delete my account (used if signup fails halfway) ----------
+
+export const deleteMyAccount = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ ok: false, error: 'Not authenticated' });
+    }
+
+    // Only allow deleting your own account
+    await User.findByIdAndDelete(req.user.userId);
+    
+    return res.status(200).json({ ok: true, message: 'Account rolled back' });
+  } catch (error) {
+    console.error('Delete my account error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
