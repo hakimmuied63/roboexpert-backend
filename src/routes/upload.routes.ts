@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { uploadImage } from '../controllers/upload.controller.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
 import { uploadLimiter } from '../middleware/rateLimiters.js';
 
 const router = Router();
@@ -14,7 +13,8 @@ const upload = multer({
   },
 });
 
-// Auth required + rate limited
-router.post('/', requireAuth, uploadLimiter, upload.single('file'), uploadImage);
+// Public — needed for signup flow (uploading PAN card before user exists)
+// Rate-limited to prevent abuse
+router.post('/', uploadLimiter, upload.single('file'), uploadImage);
 
 export default router;

@@ -10,10 +10,14 @@ import Order from '../models/Order.js';
 
 // ---------- Validation schema ----------
 
+// ---------- Validation schema ----------
+
 const createCompanySchema = z.object({
   name: z.string().min(1).trim(),
   contactEmail: z.string().email().toLowerCase().trim(),
-  contactPhone: z.string().trim().optional(),
+  contactPhone: z.string().min(5).trim(),
+  gstNumber: z.string().length(15).toUpperCase().trim(),
+  panCardUrl: z.string().url().trim(),
   address: z
     .object({
       line1: z.string().optional(),

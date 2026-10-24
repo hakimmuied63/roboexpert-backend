@@ -232,9 +232,9 @@ export const adminListPendingSellers = async (req: Request, res: Response) => {
     // Get the company name for each seller
     const companyIds = users.map((u) => u.companyId).filter(Boolean);
     const companies = await Company.find({ _id: { $in: companyIds } }).select(
-      '_id name slug contactEmail contactPhone'
+      '_id name slug contactEmail contactPhone gstNumber panCardUrl'
     );
-    const companyMap: Record<string, { _id: string; name: string; slug: string; contactEmail: string; contactPhone?: string }> = {};
+    const companyMap: Record<string, any> = {};
     companies.forEach((c) => {
       companyMap[c._id.toString()] = {
         _id: c._id.toString(),
@@ -242,6 +242,8 @@ export const adminListPendingSellers = async (req: Request, res: Response) => {
         slug: c.slug,
         contactEmail: c.contactEmail,
         contactPhone: c.contactPhone,
+        gstNumber: c.gstNumber,
+        panCardUrl: c.panCardUrl,
       };
     });
 

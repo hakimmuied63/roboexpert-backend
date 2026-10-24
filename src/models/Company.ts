@@ -6,7 +6,7 @@ export interface ICompany extends Document {
   slug: string;
   ownerUserId: Types.ObjectId;
   contactEmail: string;
-  contactPhone?: string;
+  contactPhone: string; // Made required
   address?: {
     line1?: string;
     line2?: string;
@@ -16,6 +16,8 @@ export interface ICompany extends Document {
     country?: string;
   };
   logoUrl?: string;
+  gstNumber: string;
+  panCardUrl: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +51,7 @@ const companySchema = new Schema<ICompany>(
     },
     contactPhone: {
       type: String,
+      required: true,
       trim: true,
     },
     address: {
@@ -61,6 +64,21 @@ const companySchema = new Schema<ICompany>(
     },
     logoUrl: {
       type: String,
+      trim: true,
+    },
+    gstNumber: {
+      type: String,
+      required: true,
+      uppercase: true,
+      trim: true,
+      match: [
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+        'Invalid GST number format',
+      ],
+    },
+    panCardUrl: {
+      type: String,
+      required: true,
       trim: true,
     },
     isActive: {
