@@ -16,6 +16,7 @@ import reviewRoutes from './routes/review.routes.js';
 import otpRoutes from './routes/otp.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import adminReviewRoutes from './routes/adminReview.routes.js';
+import couponRoutes from './routes/coupon.routes.js';
 
 const app: Application = express();
 
@@ -66,6 +67,7 @@ app.use('/admin/reviews', adminReviewRoutes);
 app.use('/payment-config', paymentConfigRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/otp', otpRoutes);
+app.use('/coupons', couponRoutes);
 
 // 404 handler — must come after all routes
 app.use((_req: Request, res: Response) => {

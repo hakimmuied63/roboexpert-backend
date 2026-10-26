@@ -9,6 +9,7 @@ import Product from '../models/Product.js';
 import ProductVariant from '../models/ProductVariant.js';
 import { generateOrderNumber } from '../utils/orderNumber.js';
 import { refundRazorpayPayment } from '../services/razorpay.service.js';
+import Coupon from '../models/Coupon.js';
 import {
   sendOrderConfirmationToBuyer,
   sendNewOrderToSeller,
@@ -56,8 +57,9 @@ const placeOrderSchema = z.object({
       })
     )
     .min(1, 'At least one item required'),
-  notes: z.string().trim().optional(),
+    notes: z.string().trim().optional(),
   utm: utmSchema,
+  couponCode: z.string().trim().optional(),
 });
 
 const updateStatusSchema = z.object({
@@ -114,7 +116,7 @@ export const placeOrder = async (req: Request, res: Response) => {
       });
     }
 
-    const { buyer, shippingAddress, items, notes, paymentMethod, utm } = parsed.data;
+    const { buyer, shippingAddress, items, notes, paymentMethod, utm, couponCode } = parsed.data;
 
     type EnrichedItem = {
       product: any;
@@ -188,6 +190,33 @@ export const placeOrder = async (req: Request, res: Response) => {
 
       const subtotal = companyItems.reduce((sum, i) => sum + i.lineTotal, 0);
       const shippingFee = 0;
+            // --- COUPON LOGIC ---
+            let discountAmount = 0;
+            let validCouponCode = null;
+      
+            if (couponCode) {
+              const coupon = await Coupon.findOne({
+                companyId: company._id,
+                code: couponCode.toUpperCase(),
+                isActive: true,
+              });
+      
+              if (coupon && subtotal >= coupon.minOrderAmount) {
+                if (!coupon.expiresAt || new Date() < coupon.expiresAt) {
+                  if (coupon.discountType === 'percentage') {
+                    discountAmount = (subtotal * coupon.discountValue) / 100;
+                    if (coupon.maxDiscountAmount && discountAmount > coupon.maxDiscountAmount) {
+                      discountAmount = coupon.maxDiscountAmount;
+                    }
+                  } else {
+                    discountAmount = coupon.discountValue;
+                  }
+                  if (discountAmount > subtotal) discountAmount = subtotal;
+                  validCouponCode = coupon.code;
+                }
+              }
+            }
+            // --- END COUPON LOGIC ---
 
       const uniqueCategoryIds = [
         ...new Set(
@@ -229,7 +258,7 @@ export const placeOrder = async (req: Request, res: Response) => {
         }
       }
 
-      const total = subtotal + shippingFee + packagingFee;
+      const total = subtotal + shippingFee + packagingFee - discountAmount;
       const orderNumber = await createUniqueOrderNumber();
 
       const order = await Order.create({
@@ -240,6 +269,8 @@ export const placeOrder = async (req: Request, res: Response) => {
         subtotal,
         shippingFee,
         packagingFee,
+        discountAmount,
+        couponCode: validCouponCode,
         total,
         status: 'placed',
         paymentMethod,

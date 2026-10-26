@@ -39,6 +39,8 @@ export interface IOrder extends Document {
   subtotal: number;
   shippingFee: number;
   packagingFee: number;
+  discountAmount: number;      // <-- ADDED
+  couponCode?: string | null;  // <-- ADDED
   total: number;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
@@ -122,6 +124,16 @@ const orderSchema = new Schema<IOrder>(
       type: Number,
       default: 0,
       min: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    couponCode: {
+      type: String,
+      trim: true,
+      default: null,
     },
     total: {
       type: Number,
