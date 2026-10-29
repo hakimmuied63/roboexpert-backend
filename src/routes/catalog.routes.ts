@@ -12,7 +12,8 @@ import {
   listProductsByCompanyCategory,
   listMarketplaceCategories,
 } from '../controllers/category.controller.js';
-import { listActiveCompaniesPublic } from '../controllers/company.controller.js';
+import { listActiveCompaniesPublic, getCompanyByIdPublic } from '../controllers/company.controller.js';
+
 
 
 const router = Router();
@@ -32,6 +33,7 @@ router.get('/categories/:slug/products', listProductsByCategory);
 router.get('/companies', listActiveCompaniesPublic);
 
 // Company-scoped categories + products
+router.get('/companies/:companyId', getCompanyByIdPublic);
 router.get('/companies/:companyId/categories', listCompanyCategoriesPublic);
 router.get('/companies/:companyId/products', listCompanyProducts);
 router.get('/companies/:companyId/categories/:categorySlug/products', listProductsByCompanyCategory);

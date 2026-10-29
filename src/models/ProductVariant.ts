@@ -9,6 +9,8 @@ export interface IProductVariant extends Document {
   price: number;
   stock: number;
   isActive: boolean;
+  ratingAverage: number; // <-- ADDED
+  ratingCount: number;   // <-- ADDED
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +54,17 @@ const productVariantSchema = new Schema<IProductVariant>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    ratingAverage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {

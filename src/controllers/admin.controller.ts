@@ -191,6 +191,19 @@ export const adminToggleUserStatus = async (req: Request, res: Response) => {
     user.isActive = !user.isActive;
     await user.save();
 
+    // Cascade to Company and Products
+    if (user.role === 'seller' && user.companyId) {
+      if (user.isActive === false) {
+        // If deactivating, hide company and all products
+        await Company.findByIdAndUpdate(user.companyId, { isActive: false });
+        await Product.updateMany({ companyId: user.companyId }, { isActive: false });
+      } else {
+        // If reactivating, show company AND automatically reactivate all their products
+        await Company.findByIdAndUpdate(user.companyId, { isActive: true });
+        await Product.updateMany({ companyId: user.companyId }, { isActive: true });
+      }
+    }
+
     return res.status(200).json({ ok: true, user });
   } catch (error) {
     console.error('Admin toggle user error:', error);
@@ -351,10 +364,11 @@ export const adminRejectSeller = async (req: Request, res: Response) => {
     user.approvedBy = null;
     await user.save();
 
-    // Deactivate the company too
-    if (user.companyId) {
-      await Company.findByIdAndUpdate(user.companyId, { isActive: false });
-    }
+       // Deactivate the company and hide all products
+       if (user.companyId) {
+        await Company.findByIdAndUpdate(user.companyId, { isActive: false });
+        await Product.updateMany({ companyId: user.companyId }, { isActive: false });
+      }
 
     // Fire-and-forget: notify the seller
     sendSellerRejectedEmail({
@@ -405,10 +419,11 @@ export const adminSuspendSeller = async (req: Request, res: Response) => {
     user.approvalNote = parsed.data.reason;
     await user.save();
 
-    // Deactivate company
-    if (user.companyId) {
-      await Company.findByIdAndUpdate(user.companyId, { isActive: false });
-    }
+       // Deactivate company and hide all products
+       if (user.companyId) {
+        await Company.findByIdAndUpdate(user.companyId, { isActive: false });
+        await Product.updateMany({ companyId: user.companyId }, { isActive: false });
+      }
 
     // Fire-and-forget: notify the seller
     sendSellerSuspendedEmail({

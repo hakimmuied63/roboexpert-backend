@@ -10,8 +10,6 @@ import Order from '../models/Order.js';
 
 // ---------- Validation schema ----------
 
-// ---------- Validation schema ----------
-
 const createCompanySchema = z.object({
   name: z.string().min(1).trim(),
   contactEmail: z.string().email().toLowerCase().trim(),
@@ -34,21 +32,28 @@ const createCompanySchema = z.object({
 // ---------- Create company (seller only) ----------
 
 const updateCompanySchema = z.object({
-    name: z.string().min(1).trim().optional(),
-    contactEmail: z.string().email().toLowerCase().trim().optional(),
-    contactPhone: z.string().trim().optional(),
-    address: z
-      .object({
-        line1: z.string().optional(),
-        line2: z.string().optional(),
-        city: z.string().optional(),
-        state: z.string().optional(),
-        pincode: z.string().optional(),
-        country: z.string().optional(),
-      })
-      .optional(),
-    logoUrl: z.string().url().optional(),
-  });
+  name: z.string().min(1).trim().optional(),
+  contactEmail: z.string().email().toLowerCase().trim().optional(),
+  contactPhone: z.string().trim().optional(),
+  address: z
+    .object({
+      line1: z.string().optional(),
+      line2: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
+      pincode: z.string().optional(),
+      country: z.string().optional(),
+    })
+    .optional(),
+  logoUrl: z.string().url().optional(),
+  // Storefront customization
+  bannerUrl: z.string().url().nullable().optional(),
+  tagline: z.string().max(120).nullable().optional(),
+  aboutText: z.string().max(2000).nullable().optional(),
+  primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  layoutStyle: z.enum(['grid', 'list']).optional(),
+  gridColumns: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
+});
 
 export const createCompany = async (req: Request, res: Response) => {
   try {
@@ -152,89 +157,92 @@ export const listCompanies = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+
 // ---------- Update my company (seller) ----------
 
 export const updateMyCompany = async (req: Request, res: Response) => {
-    try {
-      if (!req.user || req.user.role !== 'seller') {
-        return res.status(403).json({ ok: false, error: 'Seller access required' });
-      }
-  
-      const parsed = updateCompanySchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({
-          ok: false,
-          error: 'Validation failed',
-          details: parsed.error.flatten().fieldErrors,
-        });
-      }
-  
-      const company = await Company.findOneAndUpdate(
-        { ownerUserId: req.user.userId },
-        { $set: parsed.data },
-        { new: true }
-      );
-      if (!company) {
-        return res.status(404).json({ ok: false, error: 'No company found' });
-      }
-  
-      return res.status(200).json({ ok: true, company });
-    } catch (error) {
-      console.error('Update my company error:', error);
-      return res.status(500).json({ ok: false, error: 'Internal server error' });
+  try {
+    if (!req.user || req.user.role !== 'seller') {
+      return res.status(403).json({ ok: false, error: 'Seller access required' });
     }
-  };
-  // ---------- Seller dashboard stats ----------
+
+    const parsed = updateCompanySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Validation failed',
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const company = await Company.findOneAndUpdate(
+      { ownerUserId: req.user.userId },
+      { $set: parsed.data },
+      { new: true }
+    );
+    if (!company) {
+      return res.status(404).json({ ok: false, error: 'No company found' });
+    }
+
+    return res.status(200).json({ ok: true, company });
+  } catch (error) {
+    console.error('Update my company error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+
+// ---------- Seller dashboard stats ----------
 
 export const getSellerStats = async (req: Request, res: Response) => {
-    try {
-      if (!req.user || req.user.role !== 'seller') {
-        return res.status(403).json({ ok: false, error: 'Seller access required' });
-      }
-      if (!req.user.companyId) {
-        return res.status(400).json({ ok: false, error: 'No company found' });
-      }
-  
-      const companyId = req.user.companyId;
-  
-      const [totalProducts, activeProducts, totalOrders, pendingOrders, lowStockVariants] =
-        await Promise.all([
-          Product.countDocuments({ companyId }),
-          Product.countDocuments({ companyId, isActive: true }),
-          Order.countDocuments({ companyId }),
-          Order.countDocuments({ companyId, status: 'placed' }),
-          ProductVariant.countDocuments({ companyId, stock: { $lte: 5 }, isActive: true }),
-        ]);
-  
-      const revenueResult = await Order.aggregate([
-        { $match: { companyId: new mongoose.Types.ObjectId(companyId), paymentStatus: 'paid' } },
-        { $group: { _id: null, total: { $sum: '$total' } } },
-      ]);
-      const revenue = revenueResult[0]?.total ?? 0;
-  
-      const ordersByStatus = await Order.aggregate([
-        { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-      ]);
-  
-      return res.status(200).json({
-        ok: true,
-        stats: {
-          totalProducts,
-          activeProducts,
-          totalOrders,
-          pendingOrders,
-          lowStockVariants,
-          revenue,
-          ordersByStatus,
-        },
-      });
-    } catch (error) {
-      console.error('Seller stats error:', error);
-      return res.status(500).json({ ok: false, error: 'Internal server error' });
+  try {
+    if (!req.user || req.user.role !== 'seller') {
+      return res.status(403).json({ ok: false, error: 'Seller access required' });
     }
-  };
-  // ---------- PUBLIC: list all active companies (for homepage sellers section) ----------
+    if (!req.user.companyId) {
+      return res.status(400).json({ ok: false, error: 'No company found' });
+    }
+
+    const companyId = req.user.companyId;
+
+    const [totalProducts, activeProducts, totalOrders, pendingOrders, lowStockVariants] =
+      await Promise.all([
+        Product.countDocuments({ companyId }),
+        Product.countDocuments({ companyId, isActive: true }),
+        Order.countDocuments({ companyId }),
+        Order.countDocuments({ companyId, status: 'placed' }),
+        ProductVariant.countDocuments({ companyId, stock: { $lte: 5 }, isActive: true }),
+      ]);
+
+    const revenueResult = await Order.aggregate([
+      { $match: { companyId: new mongoose.Types.ObjectId(companyId), paymentStatus: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$total' } } },
+    ]);
+    const revenue = revenueResult[0]?.total ?? 0;
+
+    const ordersByStatus = await Order.aggregate([
+      { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    return res.status(200).json({
+      ok: true,
+      stats: {
+        totalProducts,
+        activeProducts,
+        totalOrders,
+        pendingOrders,
+        lowStockVariants,
+        revenue,
+        ordersByStatus,
+      },
+    });
+  } catch (error) {
+    console.error('Seller stats error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+
+// ---------- PUBLIC: list all active companies (for homepage sellers section) ----------
 
 export const listActiveCompaniesPublic = async (_req: Request, res: Response) => {
   try {
@@ -245,6 +253,27 @@ export const listActiveCompaniesPublic = async (_req: Request, res: Response) =>
     return res.status(200).json({ ok: true, companies });
   } catch (error) {
     console.error('List active companies public error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
+// ---------- PUBLIC: Get a single company by ID (for storefront) ----------
+
+export const getCompanyByIdPublic = async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid company ID' });
+    }
+
+    const company = await Company.findOne({ _id: companyId, isActive: true });
+    if (!company) {
+      return res.status(404).json({ ok: false, error: 'Company not found' });
+    }
+
+    return res.status(200).json({ ok: true, company });
+  } catch (error) {
+    console.error('Get company by ID error:', error);
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };

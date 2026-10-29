@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 export interface IReview extends Document {
   _id: Types.ObjectId;
   productId: Types.ObjectId;
+  variantId: Types.ObjectId;
   companyId: Types.ObjectId;
   buyerId: Types.ObjectId;
   buyerName: string;
@@ -28,6 +29,12 @@ const reviewSchema = new Schema<IReview>(
     productId: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
+      required: true,
+      index: true,
+    },
+    variantId: {
+      type: Schema.Types.ObjectId,
+      ref: 'ProductVariant',
       required: true,
       index: true,
     },

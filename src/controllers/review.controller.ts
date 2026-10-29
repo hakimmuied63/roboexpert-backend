@@ -5,13 +5,17 @@ import Review from '../models/Review.js';
 import Product from '../models/Product.js';
 import Order from '../models/Order.js';
 import OrderItem from '../models/OrderItem.js';
-import { recalculateProductRating } from '../services/rating.service.js';
+import {
+  recalculateProductRating,
+  recalculateVariantRating,
+} from '../services/rating.service.js';
 
 // ---------- Validation ----------
 
 const guestCreateReviewSchema = z.object({
   orderNumber: z.string().trim().min(1, 'Order number is required'),
   email: z.string().email().toLowerCase().trim(),
+  variantId: z.string().min(1, 'Variant ID is required'),
   rating: z.number().int().min(1).max(5),
   comment: z.string().trim().max(2000).optional(),
   images: z.array(z.string().url()).max(3).optional(),
@@ -84,7 +88,7 @@ export const createReview = async (req: Request, res: Response) => {
       });
     }
 
-    const { orderNumber, email, rating, comment, images } = parsed.data;
+    const { orderNumber, email, variantId, rating, comment, images } = parsed.data;
 
     // 1. Verify the order exists, is delivered, and matches the email
     const order = await Order.findOne({
@@ -100,16 +104,17 @@ export const createReview = async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Verify this order actually contained this product
+    // 2. Verify this order actually contained this product + variant
     const matchingItem = await OrderItem.findOne({
       orderId: order._id,
       productId: new mongoose.Types.ObjectId(productId),
+      variantId: new mongoose.Types.ObjectId(variantId),
     });
 
     if (!matchingItem) {
       return res.status(403).json({
         ok: false,
-        error: 'This product was not part of the provided order.',
+        error: 'This specific SKU was not part of the provided order.',
       });
     }
 
@@ -133,6 +138,7 @@ export const createReview = async (req: Request, res: Response) => {
     // 4. Create the review
     const review = await Review.create({
       productId: product._id,
+      variantId: new mongoose.Types.ObjectId(variantId),
       companyId: product.companyId,
       buyerId: order._id, // using orderId as the pseudo-buyerId for guest flow uniqueness
       buyerName: order.buyer.name || 'Verified Buyer',
@@ -142,7 +148,9 @@ export const createReview = async (req: Request, res: Response) => {
       images: images ?? [],
     });
 
+    // 5. Recalculate ratings
     await recalculateProductRating(product._id);
+    await recalculateVariantRating(variantId);
 
     return res.status(201).json({ ok: true, review });
   } catch (error) {
@@ -195,22 +203,23 @@ export const reportReview = async (req: Request, res: Response) => {
     return res.status(500).json({ ok: false, error: 'Internal server error' });
   }
 };
+
 // ---------- AUTH: List reviews for the seller's products ----------
 
 export const listSellerReviews = async (req: Request, res: Response) => {
-    try {
-      if (!req.user || req.user.role !== 'seller' || !req.user.companyId) {
-        return res.status(403).json({ ok: false, error: 'Seller access required' });
-      }
-  
-      const reviews = await Review.find({ companyId: req.user.companyId })
-        .populate('productId', 'name images')
-        .sort({ createdAt: -1 })
-        .lean();
-  
-      return res.status(200).json({ ok: true, reviews });
-    } catch (error) {
-      console.error('List seller reviews error:', error);
-      return res.status(500).json({ ok: false, error: 'Internal server error' });
+  try {
+    if (!req.user || req.user.role !== 'seller' || !req.user.companyId) {
+      return res.status(403).json({ ok: false, error: 'Seller access required' });
     }
-  };
+
+    const reviews = await Review.find({ companyId: req.user.companyId })
+      .populate('productId', 'name images')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({ ok: true, reviews });
+  } catch (error) {
+    console.error('List seller reviews error:', error);
+    return res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
+};
